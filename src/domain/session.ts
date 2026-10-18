@@ -137,7 +137,7 @@ export function nextDay(program: Program, history: Session[]): ProgramDay | unde
 /** Programma attivo: il più recente già iniziato e non ancora concluso. */
 export function activeProgram(programs: Program[], today: string): Program | undefined {
   return [...programs]
-    .filter((p) => p.startDate <= today && (!p.endDate || p.endDate >= today))
+    .filter((p) => !p.draft && p.startDate <= today && (!p.endDate || p.endDate >= today))
     .sort((a, b) => b.startDate.localeCompare(a.startDate))[0];
 }
 

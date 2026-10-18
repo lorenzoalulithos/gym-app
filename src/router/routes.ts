@@ -19,14 +19,16 @@ const routes: RouteRecordRaw[] = [
       {
         path: 'schede/:id',
         name: 'program',
-        component: () => import('@/pages/ProgramPage.vue'),
+        component: () => import('@/pages/ProgramWizardPage.vue'),
         props: true,
       },
       {
         path: 'schede/:programId/giorno/:dayId',
-        name: 'day',
-        component: () => import('@/pages/DayPage.vue'),
-        props: true,
+        redirect: (to) => ({
+          name: 'program',
+          params: { id: to.params.programId },
+          query: { passo: '2' },
+        }),
       },
       { path: 'foto', name: 'photos', component: () => import('@/pages/PhotosPage.vue') },
       { path: 'altro', name: 'more', component: () => import('@/pages/MorePage.vue') },

@@ -86,6 +86,10 @@ export interface Program {
   endDate?: string;
   notes?: string;
   source: 'seed' | 'user';
+  /** In preparazione: non compare nel calendario finché non viene attivata. */
+  draft?: boolean;
+  /** Pianificare uno scarico nell'ultima settimana all'attivazione. */
+  deloadLastWeek?: boolean;
   days: ProgramDay[];
   updatedAt: number;
 }

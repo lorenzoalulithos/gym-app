@@ -81,10 +81,10 @@
 import { computed, ref, watch } from 'vue';
 import { useQuasar } from 'quasar';
 import { useRouter } from 'vue-router';
+import ExerciseFormDialog from '@/components/ExerciseFormDialog.vue';
 import ExerciseImage from '@/components/ExerciseImage.vue';
 import { useLiveQuery } from '@/composables/useLiveQuery';
 import { db } from '@/db';
-import type { Exercise } from '@/db/types';
 import { MUSCLES, equipmentLabel, muscleLabel } from '@/domain/labels';
 import { useExercisesStore } from '@/stores/exercises';
 
@@ -119,42 +119,9 @@ watch([query, muscle, onlyMine], () => (limit.value = 60));
 
 function create() {
   $q.dialog({
-    title: 'Nuovo esercizio',
-    message: 'Nome (in inglese, come in palestra)',
-    prompt: { model: query.value ?? '', type: 'text' },
-    cancel: { flat: true, label: 'Annulla' },
-    ok: { label: 'Crea', color: 'primary', unelevated: true },
-  }).onOk((name: string) => void createNamed(name));
-}
-
-async function createNamed(name: string) {
-  const clean = name.trim();
-  if (!clean) return;
-  const base =
-    clean
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '') || 'esercizio';
-  const id = store.get(base) ? `${base}-${Date.now().toString(36)}` : base;
-  const ex: Exercise = {
-    id,
-    name: clean,
-    aliases: [],
-    category: 'strength',
-    equipment: 'body only',
-    primaryMuscles: muscle.value ? [muscle.value] : [],
-    secondaryMuscles: [],
-    instructions: [],
-    images: [],
-    measure: 'weight_reps',
-    loadMode: 'per_implement',
-    perSide: false,
-    implements: 1,
-    source: 'custom',
-    updatedAt: 0,
-  };
-  await store.save(ex);
-  void router.push({ name: 'exercise', params: { id } });
+    component: ExerciseFormDialog,
+    componentProps: { name: query.value ?? '', muscle: muscle.value || undefined },
+  }).onOk((id: string) => void router.push({ name: 'exercise', params: { id } }));
 }
 </script>
 

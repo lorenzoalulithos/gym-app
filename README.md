@@ -55,12 +55,30 @@ scripts/build-library.mjs
   Funziona solo con l'app installata su Chrome/Android e la frequenza la decide il browser:
   per promemoria a orario preciso serve l'APK con Capacitor (notifiche locali).
 
+## Inserire una scheda
+
+Schede → **Crea** (percorso guidato: scheda, giorni, esercizi, riepilogo), **Incolla testo** o
+**Importa file**. Il testo si scrive come su un foglio, una riga per esercizio:
+
+```
+# A Push (lunedì)
+Panca piana 4x8-10 @60 r2:00
+SS Croci ai cavi 3x12 + Push-down 3x12 r60
+Squat 12/10/8/6 @80
+Plank 3x45s
+```
+
+`4x8-10` serie e ripetizioni · `12/10/8/6` piramide · `3x45s` a tempo · `@60` kg · `@75%` del
+massimale · `r90` / `r2:00` recupero · `SS … + …` superset · `(note)`. I nomi si riconoscono in
+italiano, inglese o col nome del coach (`src/domain/textImport.ts`); quelli non trovati si scelgono
+o si creano come esercizi personalizzati.
+
 ## Ciclo mensile
 
 1. Altro → **Esporta dati (JSON)**: allenamenti, schede e un riepilogo dell'andamento per esercizio.
 2. Si decide la scheda nuova (con Claude, partendo dall'export o dagli screenshot del coach).
-3. Si crea `src/seed/programs/AAAA-MM-<nome>.ts` e la si aggiunge a `SEED_PROGRAMS` in `src/seed/index.ts`.
-4. Build e deploy: la PWA si aggiorna e importa la scheda nuova. L'import è idempotente e
-   non sovrascrive mai sessioni o modifiche fatte nell'app.
+3. La scheda nuova arriva come testo o file JSON (formato di _Schede → Esporta file_) e si importa
+   dall'app: Schede → Incolla testo / Importa file → controllo nel riepilogo → Attiva.
+   (Resta possibile includerla nella build in `src/seed/programs/` e `SEED_PROGRAMS`.)
 
 In alternativa la scheda si può creare direttamente nell'app (Schede → Duplica come nuova).

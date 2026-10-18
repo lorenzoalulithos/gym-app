@@ -51,9 +51,26 @@
         </div>
       </div>
 
+      <q-item v-if="query?.trim()" clickable class="q-py-sm create-row" @click="create">
+        <q-item-section avatar
+          ><q-icon name="add_circle" color="primary" size="32px"
+        /></q-item-section>
+        <q-item-section>
+          <q-item-label class="text-weight-bold">Crea «{{ query.trim() }}»</q-item-label>
+          <q-item-label caption>Un esercizio tuo, che non è nella lista</q-item-label>
+        </q-item-section>
+      </q-item>
+
       <q-virtual-scroll class="col" :items="results" :virtual-scroll-item-size="72" separator>
         <template #default="{ item: ex }">
-          <q-item :key="ex.id" clickable class="q-py-sm" @click="onDialogOK(ex.id)">
+          <q-item
+            :key="ex.id"
+            clickable
+            class="q-py-sm"
+            :active="selected.includes(ex.id)"
+            active-class="picked"
+            @click="pick(ex.id)"
+          >
             <q-item-section avatar>
               <ExerciseImage :src="ex.images" :alt="ex.name" size="48px" />
             </q-item-section>
@@ -67,14 +84,39 @@
                 }}
               </q-item-label>
             </q-item-section>
-            <q-item-section v-if="ex.source === 'custom'" side>
-              <q-badge color="secondary" label="mio" />
+            <q-item-section side>
+              <div class="row items-center q-gutter-x-sm no-wrap">
+                <q-badge v-if="ex.source === 'custom'" color="secondary" label="mio" />
+                <q-icon
+                  v-if="multiple"
+                  :name="selected.includes(ex.id) ? 'check_circle' : 'radio_button_unchecked'"
+                  :color="selected.includes(ex.id) ? 'primary' : 'grey-7'"
+                  size="26px"
+                />
+              </div>
             </q-item-section>
           </q-item>
         </template>
       </q-virtual-scroll>
       <div v-if="!results.length" class="q-pa-lg text-center text-muted">
-        Nessun esercizio trovato. Puoi crearlo dalla sezione Esercizi.
+        Nessun esercizio trovato: crealo con il tasto qui sopra.
+      </div>
+      <div v-if="multiple" class="picker-foot q-pa-md">
+        <q-btn
+          unelevated
+          no-caps
+          size="lg"
+          color="primary"
+          text-color="dark"
+          class="full-width text-weight-bold"
+          :disable="!selected.length"
+          :label="
+            selected.length
+              ? `Aggiungi ${selected.length} ${selected.length === 1 ? 'esercizio' : 'esercizi'}`
+              : 'Scegli uno o più esercizi'
+          "
+          @click="onDialogOK(selected)"
+        />
       </div>
     </q-card>
   </q-dialog>
@@ -82,17 +124,43 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { useDialogPluginComponent } from 'quasar';
+import { useDialogPluginComponent, useQuasar } from 'quasar';
+import ExerciseFormDialog from './ExerciseFormDialog.vue';
 import ExerciseImage from './ExerciseImage.vue';
 import { EQUIPMENT, MUSCLES, equipmentLabel, muscleLabel } from '@/domain/labels';
 import { useExercisesStore } from '@/stores/exercises';
 
-withDefaults(defineProps<{ title?: string }>(), { title: 'Scegli esercizio' });
+const props = withDefaults(
+  defineProps<{ title?: string; multiple?: boolean; initialQuery?: string }>(),
+  { title: 'Scegli esercizio', multiple: false, initialQuery: '' },
+);
 defineEmits([...useDialogPluginComponent.emits]);
 
 const { dialogRef, onDialogHide, onDialogOK, onDialogCancel } = useDialogPluginComponent();
 const store = useExercisesStore();
-const query = ref('');
+const $q = useQuasar();
+const query = ref(props.initialQuery);
+/** Selezione multipla, nell'ordine in cui si toccano. */
+const selected = ref<string[]>([]);
+
+function pick(id: string) {
+  if (!props.multiple) return onDialogOK(id);
+  const i = selected.value.indexOf(id);
+  if (i >= 0) selected.value.splice(i, 1);
+  else selected.value.push(id);
+}
+
+function create() {
+  $q.dialog({
+    component: ExerciseFormDialog,
+    componentProps: { name: query.value.trim(), muscle: muscle.value || undefined },
+  }).onOk((id: string) => {
+    if (props.multiple) {
+      selected.value.push(id);
+      query.value = '';
+    } else onDialogOK(id);
+  });
+}
 const muscle = ref('');
 const equipment = ref('');
 
@@ -104,6 +172,17 @@ const results = computed(() =>
 <style scoped lang="scss">
 .bg-dark-page {
   background: $dark-page;
+}
+.picker-foot {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-bottom: calc(16px + env(safe-area-inset-bottom));
+}
+.create-row {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.picked {
+  background: rgba(198, 255, 61, 0.08);
+  color: inherit;
 }
 .picker-head {
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);

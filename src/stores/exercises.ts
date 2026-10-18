@@ -21,6 +21,18 @@ export const useExercisesStore = defineStore('exercises', () => {
 
   const byId = computed(() => new Map(list.value.map((e) => [e.id, e])));
 
+  /** Quante volte un esercizio compare in allenamenti e schede: i più usati vanno in cima. */
+  const usage = shallowRef(new Map<string, number>());
+  liveQuery(async () => {
+    const m = new Map<string, number>();
+    const add = (id: string) => m.set(id, (m.get(id) ?? 0) + 1);
+    await db.sessions.each((s) => s.exerciseIds.forEach(add));
+    await db.programs.each((p) =>
+      p.days.forEach((d) => d.blocks.forEach((b) => b.items.forEach((i) => add(i.exerciseId)))),
+    );
+    return m;
+  }).subscribe((m) => (usage.value = m));
+
   const index = computed(() =>
     list.value.map((e) => ({
       e,
@@ -37,7 +49,8 @@ export const useExercisesStore = defineStore('exercises', () => {
           (!filter?.muscle || e.primaryMuscles.includes(filter.muscle)) &&
           (!filter?.equipment || e.equipment === filter.equipment),
       )
-      .map(({ e }) => e);
+      .map(({ e }) => e)
+      .sort((a, b) => (usage.value.get(b.id) ?? 0) - (usage.value.get(a.id) ?? 0));
   }
 
   const get = (id: string) => byId.value.get(id);
@@ -47,5 +60,11 @@ export const useExercisesStore = defineStore('exercises', () => {
     await db.exercises.put({ ...ex, updatedAt: Date.now() });
   }
 
-  return { list, byId, search, get, nameOf, save };
+  /** Id libero ricavato dal nome ("Panca Smith" → "panca-smith"). */
+  function newIdFor(name: string) {
+    const base = normalize(name).replace(/\s+/g, '-') || 'esercizio';
+    return byId.value.has(base) ? `${base}-${Date.now().toString(36)}` : base;
+  }
+
+  return { list, byId, usage, search, get, nameOf, save, newIdFor };
 });

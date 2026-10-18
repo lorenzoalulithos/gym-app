@@ -21,8 +21,11 @@ const props = withDefaults(
   { alt: '', size: '56px', animate: false },
 );
 
+// le foto scattate dall'utente sono salvate come data URL
 const images = computed(() =>
-  props.src.map((s) => `${import.meta.env.BASE_URL ?? '/'}${s}`.replace(/\/{2,}/g, '/')),
+  props.src.map((s) =>
+    s.startsWith('data:') ? s : `${import.meta.env.BASE_URL ?? '/'}${s}`.replace(/\/{2,}/g, '/'),
+  ),
 );
 const frame = ref(0);
 const failed = ref(false);

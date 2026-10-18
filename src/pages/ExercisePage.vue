@@ -60,6 +60,18 @@
       <li v-for="(s, i) in ex.instructions" :key="i">{{ s }}</li>
     </ol>
 
+    <q-btn
+      v-if="ex.source === 'custom'"
+      unelevated
+      no-caps
+      color="grey-9"
+      icon="edit"
+      label="Modifica esercizio (nome, foto, muscoli…)"
+      class="full-width q-mt-lg"
+      style="border-radius: 14px; min-height: 48px"
+      @click="editCustom"
+    />
+
     <!-- Impostazioni -->
     <q-expansion-item
       class="card q-mt-lg"
@@ -152,6 +164,7 @@
 import { computed, reactive, ref, watch } from 'vue';
 import { useQuasar } from 'quasar';
 import { useRouter } from 'vue-router';
+import ExerciseFormDialog from '@/components/ExerciseFormDialog.vue';
 import ExerciseImage from '@/components/ExerciseImage.vue';
 import LineChart from '@/components/LineChart.vue';
 import { useLiveQuery } from '@/composables/useLiveQuery';
@@ -287,6 +300,10 @@ function remove() {
   }).onOk(() => {
     void db.exercises.delete(props.id).then(() => router.back());
   });
+}
+
+function editCustom() {
+  $q.dialog({ component: ExerciseFormDialog, componentProps: { exerciseId: props.id } });
 }
 
 const openSession = (id: string) => void router.push({ name: 'workout', params: { id } });
