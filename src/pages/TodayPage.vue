@@ -73,6 +73,17 @@
         </q-btn>
       </div>
       <div class="text-h5 text-weight-bold">{{ next.name }}</div>
+      <q-chip
+        v-if="deload.active.value"
+        dense
+        color="info"
+        text-color="dark"
+        icon="battery_charging_full"
+        class="q-ml-none"
+        :label="`Scarico fino a ${shortDay(deload.current.value!.to)}`"
+        clickable
+        @click="askEndDeload"
+      />
       <div class="text-muted q-mt-xs">
         {{ exerciseCount }} esercizi · ~{{ estMinutes }} min<template
           v-if="isToday || !upcoming || upcoming.date === today"
@@ -155,7 +166,7 @@
     </div>
 
     <!-- Da fare -->
-    <template v-if="missed.length || photoDue">
+    <template v-if="missed.length || photoDue || deload.showAdvice.value || deload.upcoming.value">
       <div class="section-label q-mb-xs">Da fare</div>
       <div class="card todo q-mb-md">
         <div v-for="m in missed" :key="m.date" class="todo-row">
@@ -187,6 +198,30 @@
               </q-list>
             </q-menu>
           </q-btn>
+        </div>
+        <div v-if="deload.showAdvice.value" class="todo-row" @click="openDeload">
+          <q-icon name="battery_charging_full" color="info" size="22px" />
+          <div class="col" style="min-width: 0">
+            <div class="ellipsis text-weight-medium">
+              {{
+                deload.advice.value.level === 'now'
+                  ? 'Settimana di scarico consigliata'
+                  : 'Scarico in arrivo'
+              }}
+            </div>
+            <div class="text-caption text-muted ellipsis">{{ deload.advice.value.reasons[0] }}</div>
+          </div>
+          <q-icon name="chevron_right" color="grey-5" />
+        </div>
+        <div v-if="deload.upcoming.value" class="todo-row">
+          <q-icon name="event_available" color="info" size="22px" />
+          <div class="col" style="min-width: 0">
+            <div class="ellipsis text-weight-medium">Scarico pianificato</div>
+            <div class="text-caption text-muted">
+              {{ shortDay(deload.upcoming.value.from) }} – {{ shortDay(deload.upcoming.value.to) }}
+            </div>
+          </div>
+          <q-btn flat dense no-caps color="grey-5" label="Annulla" @click="cancelDeload" />
         </div>
         <div v-if="photoDue" class="todo-row">
           <q-icon name="photo_camera" color="secondary" size="22px" />
@@ -329,10 +364,12 @@
 import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useQuasar } from 'quasar';
+import DeloadDialog from '@/components/DeloadDialog.vue';
 import MoveDialog from '@/components/MoveDialog.vue';
+import { deloadWindows, endDeload, useDeload } from '@/composables/useDeload';
 import { moveWorkout, skipWorkout, useCalendar } from '@/composables/useCalendar';
 import { useLiveQuery } from '@/composables/useLiveQuery';
-import { db } from '@/db';
+import { db, setMeta } from '@/db';
 import type { Session } from '@/db/types';
 import { formatDate, formatMonth, summarizeTargets } from '@/domain/format';
 import { useToday } from '@/composables/useToday';
@@ -364,6 +401,32 @@ import { useWorkoutStore } from '@/stores/workout';
 const router = useRouter();
 const $q = useQuasar();
 const { input } = useCalendar();
+const deload = useDeload(() => sessions.value);
+
+const shortDay = (iso: string) =>
+  new Date(`${iso}T12:00`).toLocaleDateString('it-IT', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  });
+
+function openDeload() {
+  $q.dialog({ component: DeloadDialog, componentProps: { advice: deload.advice.value } });
+}
+
+async function cancelDeload() {
+  const all = (await deloadWindows()).filter((w) => w.from <= today.value);
+  await setMeta('deload:windows', all);
+}
+
+function askEndDeload() {
+  $q.dialog({
+    title: 'Terminare lo scarico?',
+    message: 'Dal prossimo allenamento serie e carichi tornano normali.',
+    cancel: { flat: true, label: 'No' },
+    ok: { label: 'Termina', color: 'primary', textColor: 'dark', unelevated: true },
+  }).onOk(() => void endDeload(today.value));
+}
 const exercises = useExercisesStore();
 const settings = useSettingsStore();
 const workout = useWorkoutStore();

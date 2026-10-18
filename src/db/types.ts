@@ -131,7 +131,16 @@ export interface Session {
   blocks: SessionBlock[];
   /** Derivato da blocks (vedi touchSession), indicizzato per lo storico per esercizio. */
   exerciseIds: string[];
+  /** Allenamento della settimana di scarico: esce da stalli, confronti e precompilazione. */
+  deload?: boolean;
   updatedAt: number;
+}
+
+/** Settimana (o periodo) di scarico pianificata. */
+export interface DeloadWindow {
+  /** YYYY-MM-DD, inclusi */
+  from: string;
+  to: string;
 }
 
 export type Pose = 'front' | 'side' | 'back';

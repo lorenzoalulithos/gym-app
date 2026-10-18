@@ -52,6 +52,12 @@
 
     <q-page-container>
       <q-page v-if="s" class="page-pad">
+        <div v-if="s.deload" class="deload-banner q-mb-md">
+          <q-icon name="battery_charging_full" size="20px" />
+          <span>
+            Settimana di scarico: serie ridotte e carichi al 90%. Oggi si recupera, niente record.
+          </span>
+        </div>
         <FocusView
           v-if="mode === 'live' && settings.focusMode"
           :last-by-exercise="lastByExercise"
@@ -439,6 +445,17 @@ onBeforeUnmount(() => {
 .superset {
   border-left: 2px dotted rgba(198, 255, 61, 0.5);
   padding-left: 10px;
+}
+.deload-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  color: $info;
+  background: rgba(79, 195, 247, 0.1);
+  border: 1px solid rgba(79, 195, 247, 0.35);
 }
 .prog-row {
   padding: 6px 0;

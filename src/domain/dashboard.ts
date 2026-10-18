@@ -157,7 +157,7 @@ export function stalledExercises(
   n = 3,
 ): { exerciseId: string; since: string }[] {
   const done = sessions
-    .filter((s) => s.status === 'done')
+    .filter((s) => s.status === 'done' && !s.deload)
     .sort((a, b) => a.date.localeCompare(b.date));
   const ids = new Set(done.flatMap((s) => s.exerciseIds));
   const out: { exerciseId: string; since: string }[] = [];

@@ -5,6 +5,8 @@ import { db } from '@/db';
 import type { LoggedSet, Program, ProgramDay, Session, SetTarget } from '@/db/types';
 import { todayIso } from '@/domain/format';
 import { buildItem, emptySession, restAfter, sessionFromDay, touchSession } from '@/domain/session';
+import { deloadWindows } from '@/composables/useDeload';
+import { deloadSession, isDeloadDate } from '@/domain/deload';
 import { useExercisesStore } from './exercises';
 import { useSettingsStore } from './settings';
 import { useTimerStore } from './timer';
@@ -92,7 +94,13 @@ export const useWorkoutStore = defineStore('workout', () => {
   }
 
   function startFromDay(program: Program, day: ProgramDay) {
-    return startOnce(async () => sessionFromDay(program, day, await doneHistory(), todayIso()));
+    return startOnce(async () => {
+      const date = todayIso();
+      const s = sessionFromDay(program, day, await doneHistory(), date);
+      // durante la settimana di scarico: meno serie e carichi più bassi
+      if (isDeloadDate(date, await deloadWindows())) deloadSession(s, useExercisesStore().byId);
+      return s;
+    });
   }
 
   function startEmpty() {

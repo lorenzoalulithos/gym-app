@@ -42,7 +42,9 @@ export function compareWithLast(
     if (!ex) continue;
     const cur = sessionValue(session, ex);
     if (!cur) continue;
-    const prevSession = history.find((h) => h.exerciseIds.includes(id) && sessionValue(h, ex));
+    const prevSession = history.find(
+      (h) => !h.deload && h.exerciseIds.includes(id) && sessionValue(h, ex),
+    );
     const prev = prevSession ? sessionValue(prevSession, ex) : null;
     const volumeNow = volumeOf(session, ex);
     const volumeBefore = prevSession ? volumeOf(prevSession, ex) : null;

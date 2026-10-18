@@ -1,11 +1,12 @@
 import JSZip from 'jszip';
-import { db } from '@/db';
+import { db, getMeta } from '@/db';
 import type {
   BodyMetric,
   Exercise,
   Program,
   ProgressPhoto,
   ScheduleOverride,
+  DeloadWindow,
   Session,
 } from '@/db/types';
 import { exerciseTrends } from '@/domain/analysis';
@@ -25,6 +26,8 @@ export interface BackupData {
   bodyMetrics: BodyMetric[];
   /** Spostamenti e allenamenti saltati nel calendario. */
   schedule?: ScheduleOverride[];
+  /** Settimane di scarico pianificate o fatte. */
+  deloads?: DeloadWindow[];
   /** Riepilogo per esercizio, pensato per farsi proporre la scheda successiva. */
   analysis?: ReturnType<typeof exerciseTrends>;
 }
@@ -61,6 +64,7 @@ export async function collectData(withAnalysis = true): Promise<BackupData> {
     sessions,
     bodyMetrics,
     schedule,
+    deloads: (await getMeta<DeloadWindow[]>('deload:windows')) ?? [],
   };
   if (withAnalysis)
     data.analysis = exerciseTrends(data.sessions, new Map(allExercises.map((e) => [e.id, e])));
@@ -165,7 +169,7 @@ export async function readBackup(file: File) {
 export async function applyBackup(data: BackupData, photos: ProgressPhoto[] | null) {
   await db.transaction(
     'rw',
-    [db.exercises, db.programs, db.sessions, db.bodyMetrics, db.schedule, db.photos],
+    [db.exercises, db.programs, db.sessions, db.bodyMetrics, db.schedule, db.photos, db.meta],
     async () => {
       await db.exercises.bulkPut(data.exercises);
       await db.programs.clear();
@@ -176,6 +180,7 @@ export async function applyBackup(data: BackupData, photos: ProgressPhoto[] | nu
       await db.bodyMetrics.bulkAdd(data.bodyMetrics ?? []);
       await db.schedule.clear();
       await db.schedule.bulkAdd(data.schedule ?? []);
+      if (data.deloads) await db.meta.put({ key: 'deload:windows', value: data.deloads });
       if (photos) {
         await db.photos.clear();
         await db.photos.bulkAdd(photos);

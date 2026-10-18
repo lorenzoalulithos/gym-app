@@ -14,6 +14,7 @@ import {
 import { compareWithLast } from '@/domain/compare';
 import { firstUndone, setOrder } from '@/domain/focus';
 import { suggestWarmupFor, warmupSets } from '@/domain/warmup';
+import { deloadAdvice, deloadSession, trainingWeeks } from '@/domain/deload';
 import { exerciseTrends } from '@/domain/analysis';
 
 const ex = (over: Partial<Exercise> = {}): Exercise => ({
@@ -311,5 +312,60 @@ describe('riscaldamento', () => {
     s.blocks[0]!.items[0]!.sets.unshift(warm);
     expect(bestsFor([s], 'x', ex()).weight).toBe(50);
     expect(setOrder(s).map((p) => p.si)).toEqual([0, 1]);
+  });
+});
+
+describe('settimana di scarico', () => {
+  const weekly = (weeks: number, end = '2026-11-28') =>
+    Array.from({ length: weeks }, (_, i) => {
+      const d = new Date(`${end}T12:00:00`);
+      d.setDate(d.getDate() - 7 * i);
+      const iso = d.toISOString().slice(0, 10);
+      return session(iso, [{ weightKg: 20, reps: 8 }], iso);
+    });
+
+  it('conta le settimane di fila e si ferma a una pausa o a uno scarico', () => {
+    expect(trainingWeeks(weekly(6), [], '2026-11-28')).toBe(6);
+    expect(trainingWeeks(weekly(6), [{ from: '2026-11-09', to: '2026-11-15' }], '2026-11-28')).toBe(
+      2,
+    );
+    const withGap = weekly(6).filter((s) => s.date !== '2026-11-14');
+    expect(trainingWeeks(withGap, [], '2026-11-28')).toBe(2);
+  });
+
+  it('consiglia lo scarico dopo 6 settimane, o prima con segnali di fatica', () => {
+    const m = new Map([['x', ex()]]);
+    expect(deloadAdvice(weekly(3), m, [], '2026-11-28').level).toBe('none');
+    expect(deloadAdvice(weekly(4), m, [], '2026-11-28').level).toBe('soon');
+    expect(deloadAdvice(weekly(6), m, [], '2026-11-28').level).toBe('now');
+    const hard = weekly(4).map((s) => ({ ...s, difficulty: 5 }));
+    const adv = deloadAdvice(hard, m, [], '2026-11-28');
+    expect(adv.level).toBe('now');
+    expect(adv.reasons.some((r) => r.includes('molto duri'))).toBe(true);
+  });
+
+  it('allenamento di scarico: ~60% delle serie e carichi al 90%, riscaldamento intatto', () => {
+    const s = session('2026-11-30', [
+      { weightKg: 50, reps: 6 },
+      { weightKg: 50, reps: 6 },
+      { weightKg: 50, reps: 6 },
+      { weightKg: 50, reps: 6 },
+    ]);
+    s.blocks[0]!.items[0]!.sets.unshift({
+      target: { kind: 'warmup' },
+      weightKg: 20,
+      reps: 10,
+      done: false,
+    });
+    deloadSession(s, new Map([['x', ex({ loadMode: 'total' })]]));
+    const sets = s.blocks[0]!.items[0]!.sets;
+    expect(s.deload).toBe(true);
+    expect(sets.map((x) => x.weightKg)).toEqual([20, 45, 45]);
+  });
+
+  it('dopo lo scarico la precompilazione riparte dai carichi normali', () => {
+    const normal = session('2026-11-20', [{ weightKg: 50, reps: 6 }], 'n');
+    const light = { ...session('2026-11-27', [{ weightKg: 45, reps: 6 }], 'l'), deload: true };
+    expect(lastPerformance([light, normal], 'x')?.sets[0]?.weightKg).toBe(50);
   });
 });

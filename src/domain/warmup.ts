@@ -18,7 +18,8 @@ const MIN_WORK_KG: Partial<Record<Exercise['loadMode'], number>> = {
   stack: 30,
 };
 
-function roundTo(kg: number, ex: Pick<Exercise, 'loadMode'>): number {
+/** Arrotonda ai pesi disponibili in palestra per quel tipo di carico. */
+export function roundTo(kg: number, ex: Pick<Exercise, 'loadMode'>): number {
   if (ex.loadMode === 'per_implement') return kg < 10 ? Math.round(kg) : Math.round(kg / 2) * 2;
   if (ex.loadMode === 'stack') return Math.round(kg / 5) * 5;
   return Math.round(kg / 2.5) * 2.5;

@@ -17,6 +17,8 @@ const defaults = {
   countdownSec: 3,
   /** Mese (YYYY-MM) in cui l'utente ha rimandato la foto. */
   photoSnoozedMonth: '',
+  /** Fino a questa data (YYYY-MM-DD) non riproporre lo scarico. */
+  deloadSnoozedUntil: '',
 };
 
 export type Settings = typeof defaults;

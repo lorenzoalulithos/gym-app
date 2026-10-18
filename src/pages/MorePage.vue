@@ -19,6 +19,14 @@
         </q-item-section>
         <q-item-section side><q-icon name="chevron_right" /></q-item-section>
       </q-item>
+      <q-item clickable @click="openDeload">
+        <q-item-section avatar><q-icon name="battery_charging_full" color="info" /></q-item-section>
+        <q-item-section>
+          <q-item-label>Settimana di scarico</q-item-label>
+          <q-item-label caption>{{ deloadCaption }}</q-item-label>
+        </q-item-section>
+        <q-item-section side><q-icon name="chevron_right" /></q-item-section>
+      </q-item>
       <q-item clickable to="/foto">
         <q-item-section avatar><q-icon name="photo_camera" color="secondary" /></q-item-section>
         <q-item-section>
@@ -156,7 +164,11 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
+import DeloadDialog from '@/components/DeloadDialog.vue';
+import { useDeload } from '@/composables/useDeload';
+import { useLiveQuery } from '@/composables/useLiveQuery';
+import { db } from '@/db';
 import { useQuasar } from 'quasar';
 import { applyBackup, exportFullZip, exportJson, readBackup } from '@/services/backup';
 import { askNotificationPermission, beep, notify, unlockAudio } from '@/services/feedback';
@@ -171,6 +183,20 @@ import { useWorkoutStore } from '@/stores/workout';
 
 const $q = useQuasar();
 const settings = useSettingsStore();
+const { data: allSessions } = useLiveQuery(() => db.sessions.toArray(), [], []);
+const deload = useDeload(() => allSessions.value);
+const deloadCaption = computed(() => {
+  const short = (iso: string) =>
+    new Date(`${iso}T12:00`).toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
+  if (deload.current.value) return `In corso fino al ${short(deload.current.value.to)}`;
+  if (deload.upcoming.value) return `Pianificata dal ${short(deload.upcoming.value.from)}`;
+  const w = deload.advice.value.weeks;
+  return `${w} ${w === 1 ? 'settimana' : 'settimane'} di allenamento dall'ultima pausa`;
+});
+
+function openDeload() {
+  $q.dialog({ component: DeloadDialog, componentProps: { advice: deload.advice.value } });
+}
 const workout = useWorkoutStore();
 const busy = ref(false);
 const build = __APP_BUILD__;

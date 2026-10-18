@@ -23,7 +23,8 @@ export function touchSession(s: Session): Session {
 /** Le serie dell'ultima volta che l'esercizio è stato fatto (history in ordine dal più recente). */
 export function lastPerformance(history: Session[], exerciseId: string): SessionItem | undefined {
   for (const s of history) {
-    if (s.status !== 'done') continue;
+    // dopo lo scarico si riparte dai carichi normali, non da quelli ridotti
+    if (s.status !== 'done' || s.deload) continue;
     for (const b of s.blocks) {
       const item = b.items.find((i) => i.exerciseId === exerciseId && i.sets.some(isWorkSet));
       if (item) return { ...item, sets: item.sets.filter(isWorkSet) };
