@@ -7,15 +7,26 @@ export interface SetPos {
 }
 
 /**
- * Ordine in cui si eseguono le serie: blocco per blocco; nei superset e nei circuiti
- * a giri (A1, B1, A2, B2…), negli esercizi singoli una serie dopo l'altra.
+ * Ordine in cui si eseguono le serie: blocco per blocco; prima il riscaldamento,
+ * poi nei superset e nei circuiti a giri (A1, B1, A2, B2…), negli esercizi singoli
+ * una serie dopo l'altra.
  */
 export function setOrder(session: Session): SetPos[] {
   const out: SetPos[] = [];
   session.blocks.forEach((b, bi) => {
-    const rounds = Math.max(0, ...b.items.map((i) => i.sets.length));
-    for (let si = 0; si < rounds; si++)
+    // il riscaldamento di ogni esercizio viene prima dei giri di lavoro
+    const warmups = b.items.map((it) =>
+      it.sets.findIndex((s) => s.target?.kind !== 'warmup') === -1
+        ? it.sets.length
+        : it.sets.findIndex((s) => s.target?.kind !== 'warmup'),
+    );
+    b.items.forEach((_, ii) => {
+      for (let si = 0; si < warmups[ii]!; si++) out.push({ bi, ii, si });
+    });
+    const rounds = Math.max(0, ...b.items.map((it, ii) => it.sets.length - warmups[ii]!));
+    for (let r = 0; r < rounds; r++)
       b.items.forEach((it, ii) => {
+        const si = warmups[ii]! + r;
         if (si < it.sets.length) out.push({ bi, ii, si });
       });
   });

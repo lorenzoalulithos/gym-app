@@ -9,6 +9,7 @@ import type {
   SetTarget,
 } from '@/db/types';
 import { repsMax } from './format';
+import { isWorkSet } from './records';
 
 const uid = () => crypto.randomUUID();
 
@@ -24,8 +25,8 @@ export function lastPerformance(history: Session[], exerciseId: string): Session
   for (const s of history) {
     if (s.status !== 'done') continue;
     for (const b of s.blocks) {
-      const item = b.items.find((i) => i.exerciseId === exerciseId && i.sets.some((x) => x.done));
-      if (item) return { ...item, sets: item.sets.filter((x) => x.done) };
+      const item = b.items.find((i) => i.exerciseId === exerciseId && i.sets.some(isWorkSet));
+      if (item) return { ...item, sets: item.sets.filter(isWorkSet) };
     }
   }
   return undefined;
@@ -162,7 +163,7 @@ export function sessionStats(s: Session, exercises: Map<string, Pick<Exercise, '
   for (const b of s.blocks)
     for (const i of b.items)
       for (const set of i.sets) {
-        if (!set.done) continue;
+        if (!isWorkSet(set)) continue;
         sets++;
         volume +=
           (set.weightKg ?? 0) * (set.reps ?? 0) * (exercises.get(i.exerciseId)?.implements ?? 1);

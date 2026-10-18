@@ -1,6 +1,6 @@
 import type { Exercise, Session } from '@/db/types';
 import { formatSet } from './format';
-import { setMetrics } from './records';
+import { isWorkSet, setMetrics } from './records';
 
 export interface ExerciseTrend {
   exerciseId: string;
@@ -22,7 +22,7 @@ export function sessionValue(s: Session, ex: Exercise): { value: number; topSet:
     for (const i of b.items) {
       if (i.exerciseId !== ex.id) continue;
       for (const set of i.sets) {
-        if (!set.done) continue;
+        if (!isWorkSet(set)) continue;
         const m = setMetrics(set, ex);
         const value =
           m.e1rm || (ex.measure === 'reps' ? m.reps + m.weight / 100 : 0) || m.duration || m.weight;

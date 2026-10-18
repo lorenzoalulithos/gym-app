@@ -2,7 +2,7 @@ import { defineStore } from 'pinia';
 import { Notify } from 'quasar';
 import { ref, watch } from 'vue';
 import { db } from '@/db';
-import type { LoggedSet, Program, ProgramDay, Session } from '@/db/types';
+import type { LoggedSet, Program, ProgramDay, Session, SetTarget } from '@/db/types';
 import { todayIso } from '@/domain/format';
 import { buildItem, emptySession, restAfter, sessionFromDay, touchSession } from '@/domain/session';
 import { useExercisesStore } from './exercises';
@@ -168,6 +168,23 @@ export const useWorkoutStore = defineStore('workout', () => {
     sets.splice(si + 1, 0, copy);
   }
 
+  /** Esercizi per cui il riscaldamento suggerito è stato rifiutato (solo per questa sessione). */
+  const warmupDismissed = ref(new Set<string>());
+
+  function addWarmup(bi: number, ii: number, targets: SetTarget[]) {
+    const sets = targets.map((t): LoggedSet => {
+      const s: LoggedSet = { target: t, done: false };
+      if (t.weightKg !== undefined) s.weightKg = t.weightKg;
+      if (typeof t.reps === 'number') s.reps = t.reps;
+      return s;
+    });
+    item(bi, ii).sets.unshift(...sets);
+  }
+
+  function dismissWarmup(itemId: string) {
+    warmupDismissed.value = new Set(warmupDismissed.value).add(itemId);
+  }
+
   function removeSet(bi: number, ii: number, si: number) {
     item(bi, ii).sets.splice(si, 1);
   }
@@ -243,6 +260,9 @@ export const useWorkoutStore = defineStore('workout', () => {
     uncompleteSet,
     addSet,
     duplicateSet,
+    addWarmup,
+    dismissWarmup,
+    warmupDismissed,
     setItemRest,
     removeSet,
     addExercise,

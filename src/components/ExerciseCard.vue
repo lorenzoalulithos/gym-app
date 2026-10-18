@@ -72,6 +72,8 @@
     </div>
     <div v-if="item.notes" class="text-caption text-warning q-mt-xs">{{ item.notes }}</div>
 
+    <WarmupSuggestion v-if="mode === 'live'" :bi="bi" :ii="ii" class="q-mt-sm" />
+
     <div class="q-mt-sm">
       <template v-if="exercise">
         <SetRow
@@ -112,8 +114,9 @@ import { computed, ref } from 'vue';
 import { useQuasar } from 'quasar';
 import ExerciseImage from './ExerciseImage.vue';
 import SetRow from './SetRow.vue';
+import WarmupSuggestion from './WarmupSuggestion.vue';
 import ExerciseInfoDialog from './ExerciseInfoDialog.vue';
-import type { SessionItem } from '@/db/types';
+import type { SessionItem, SetTarget } from '@/db/types';
 import { formatSet, summarizeTargets } from '@/domain/format';
 import type { SessionRecords } from '@/domain/records';
 import { restAfter, suggestIncrease } from '@/domain/session';
@@ -158,7 +161,12 @@ async function editRest() {
 }
 const forceWeight = ref(false);
 
-const targets = computed(() => props.item.sets.map((s) => s.target).filter((t) => t !== undefined));
+// il riscaldamento non fa parte della scheda né del suggerimento di carico
+const targets = computed(() =>
+  props.item.sets
+    .map((s) => s.target)
+    .filter((t): t is SetTarget => t !== undefined && t.kind !== 'warmup'),
+);
 const targetSummary = computed(() =>
   targets.value.length ? summarizeTargets(targets.value, exercise.value) : '',
 );

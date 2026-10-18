@@ -13,6 +13,7 @@ import {
 } from '@/domain/session';
 import { compareWithLast } from '@/domain/compare';
 import { firstUndone, setOrder } from '@/domain/focus';
+import { suggestWarmupFor, warmupSets } from '@/domain/warmup';
 import { exerciseTrends } from '@/domain/analysis';
 
 const ex = (over: Partial<Exercise> = {}): Exercise => ({
@@ -266,5 +267,49 @@ describe('modalità focus', () => {
     const order = setOrder(s).map((p) => `${p.bi}${p.ii}${p.si}`);
     expect(order).toEqual(['000', '010', '001', '011', '012', '100']);
     expect(firstUndone(s)).toBe(2);
+  });
+});
+
+describe('riscaldamento', () => {
+  it('bilanciere: dal bilanciere scarico a rampa, arrotondato a 2,5', () => {
+    const w = warmupSets(ex({ loadMode: 'total' }), 55);
+    expect(w.map((s) => [s.weightKg, s.reps])).toEqual([
+      [20, 10],
+      [27.5, 8],
+      [37.5, 5],
+    ]);
+    expect(w.every((s) => s.kind === 'warmup')).toBe(true);
+  });
+  it('carichi leggeri: niente riscaldamento', () => {
+    expect(warmupSets(ex({ loadMode: 'per_implement' }), 8)).toEqual([]);
+    expect(warmupSets(ex({ measure: 'reps', loadMode: 'added' }), 12.5)).toEqual([]);
+  });
+  it('solo al primo esercizio pesante dello stesso muscolo', () => {
+    const exs = new Map([
+      ['a', ex({ id: 'a', loadMode: 'total', primaryMuscles: ['hamstrings'] })],
+      ['b', ex({ id: 'b', loadMode: 'total', primaryMuscles: ['hamstrings'] })],
+      ['c', ex({ id: 'c', loadMode: 'per_implement', primaryMuscles: ['shoulders'] })],
+    ]);
+    const blk = (id: string, kg: number) => ({
+      id,
+      type: 'single' as const,
+      restSec: 90,
+      items: [{ id, exerciseId: id, sets: [{ weightKg: kg, reps: 6, done: false }] }],
+    });
+    const s: Session = {
+      ...session('2026-10-24', []),
+      status: 'active',
+      blocks: [blk('a', 55), blk('b', 60), blk('c', 19)],
+    };
+    expect(suggestWarmupFor(s, 0, 0, exs).length).toBeGreaterThan(0);
+    expect(suggestWarmupFor(s, 1, 0, exs)).toEqual([]);
+    expect(suggestWarmupFor(s, 2, 0, exs).map((x) => x.weightKg)).toEqual([10, 14]);
+  });
+  it('le serie di riscaldamento non contano per i record e vengono prima nel focus', () => {
+    const warm = { target: { kind: 'warmup' as const }, weightKg: 100, reps: 10, done: true };
+    const s = session('2026-10-24', [{ weightKg: 50, reps: 6 }]);
+    s.blocks[0]!.items[0]!.sets.unshift(warm);
+    expect(bestsFor([s], 'x', ex()).weight).toBe(50);
+    expect(setOrder(s).map((p) => p.si)).toEqual([0, 1]);
   });
 });

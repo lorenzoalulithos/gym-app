@@ -9,6 +9,8 @@ const defaults = {
   keepAwake: true,
   /** Allenamento un esercizio alla volta, a tutto schermo. */
   focusMode: true,
+  /** Propone le serie di riscaldamento prima degli esercizi pesanti. */
+  suggestWarmup: true,
   /** Recupero proposto per esercizi aggiunti al volo. */
   defaultRestSec: 90,
   /** Conto alla rovescia prima delle serie a tempo. */

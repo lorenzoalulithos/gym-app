@@ -19,6 +19,9 @@ export interface Bests {
   volume: number;
 }
 
+/** Serie di lavoro svolta: il riscaldamento non conta per record, volume e confronti. */
+export const isWorkSet = (s: LoggedSet) => s.done && s.target?.kind !== 'warmup';
+
 const emptyBests = (): Bests => ({ e1rm: 0, weight: 0, reps: 0, duration: 0, volume: 0 });
 
 type ExLike = Pick<Exercise, 'measure' | 'implements'>;
@@ -42,7 +45,7 @@ export function setMetrics(set: LoggedSet, ex: ExLike): Omit<Bests, 'volume'> {
 
 export function itemVolume(sets: LoggedSet[], ex: ExLike): number {
   return sets
-    .filter((s) => s.done)
+    .filter(isWorkSet)
     .reduce((sum, s) => sum + (s.weightKg ?? 0) * (s.reps ?? 0) * ex.implements, 0);
 }
 
@@ -56,7 +59,7 @@ export function bestsFor(sessions: Session[], exerciseId: string, ex: ExLike): B
   for (const s of sessions) {
     for (const item of setsOf(s, exerciseId)) {
       for (const set of item.sets) {
-        if (!set.done) continue;
+        if (!isWorkSet(set)) continue;
         const m = setMetrics(set, ex);
         b.e1rm = Math.max(b.e1rm, m.e1rm);
         b.weight = Math.max(b.weight, m.weight);
@@ -101,7 +104,7 @@ export function sessionRecords(
         running.set(item.exerciseId, best);
       }
       item.sets.forEach((set, idx) => {
-        if (!set.done) return;
+        if (!isWorkSet(set)) return;
         const m = setMetrics(set, ex);
         const kinds = (['e1rm', 'weight', 'reps', 'duration'] as const).filter(
           (k) => m[k] > 0 && m[k] > best[k],

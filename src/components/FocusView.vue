@@ -75,16 +75,18 @@
         </div>
       </div>
 
+      <WarmupSuggestion :bi="cur.bi" :ii="cur.ii" />
+
       <div class="row items-baseline q-mb-xs">
         <div class="col text-h6">
-          Serie {{ cur.si + 1 }} <span class="text-muted">di {{ item.sets.length }}</span>
-          <q-badge
-            v-if="set.target?.kind === 'warmup'"
-            color="warning"
-            text-color="dark"
-            label="riscaldamento"
-            class="q-ml-sm"
-          />
+          <template v-if="isWarmup">
+            <span class="text-warning">Riscaldamento {{ cur.si + 1 }}</span>
+            <span class="text-muted"> di {{ warmupCount }}</span>
+          </template>
+          <template v-else>
+            Serie {{ cur.si - warmupCount + 1 }}
+            <span class="text-muted">di {{ item.sets.length - warmupCount }}</span>
+          </template>
         </div>
         <q-chip
           dense
@@ -99,7 +101,8 @@
       </div>
       <div class="hints q-mb-md">
         <div v-if="set.target">
-          <span class="text-muted">Scheda</span> {{ formatTarget(set.target, ex) }}
+          <span class="text-muted">{{ isWarmup ? 'Obiettivo' : 'Scheda' }}</span>
+          {{ formatTarget(set.target, ex) }}
         </div>
         <div v-if="lastSet">
           <span class="text-muted">Ultima volta</span> {{ formatSet(lastSet, ex) }}
@@ -194,6 +197,7 @@ import { useQuasar } from 'quasar';
 import ExerciseImage from './ExerciseImage.vue';
 import ExerciseInfoDialog from './ExerciseInfoDialog.vue';
 import NumberField from './NumberField.vue';
+import WarmupSuggestion from './WarmupSuggestion.vue';
 import { useRestPicker } from '@/composables/useRestPicker';
 import type { LoggedSet, SessionItem } from '@/db/types';
 import { firstUndone, setOrder } from '@/domain/focus';
@@ -237,10 +241,16 @@ const block = computed(() => (cur.value ? s.value!.blocks[cur.value.bi] : undefi
 const item = computed(() => (cur.value ? block.value!.items[cur.value.ii] : undefined));
 const set = computed(() => (cur.value ? item.value!.sets[cur.value.si] : undefined));
 const ex = computed(() => (item.value ? exercises.get(item.value.exerciseId) : undefined));
+const isWarmup = computed(() => set.value?.target?.kind === 'warmup');
+const warmupCount = computed(
+  () => item.value?.sets.filter((x) => x.target?.kind === 'warmup').length ?? 0,
+);
 
 const lastSet = computed(() => {
   const last = item.value ? props.lastByExercise.get(item.value.exerciseId) : undefined;
-  return last ? (last.sets[cur.value!.si] ?? last.sets.at(-1)) : undefined;
+  if (!last || isWarmup.value) return undefined;
+  const wi = cur.value!.si - warmupCount.value;
+  return last.sets[wi] ?? last.sets.at(-1);
 });
 
 const blockLabel = computed(() => {
@@ -264,7 +274,7 @@ const showTime = computed(
 );
 
 const restSec = computed(() =>
-  block.value && cur.value ? restAfter(block.value, cur.value.ii) : 0,
+  block.value && cur.value ? restAfter(block.value, cur.value.ii, set.value?.target?.restSec) : 0,
 );
 const restLabel = computed(() =>
   restSec.value ? `${formatClock(restSec.value)} rec.` : 'no rec.',
@@ -274,7 +284,9 @@ const nextLabel = computed(() => {
   const n = order.value[index.value + 1];
   if (!n) return '';
   const it = s.value!.blocks[n.bi]!.items[n.ii]!;
-  return `${exercises.nameOf(it.exerciseId)} · serie ${n.si + 1}`;
+  const warm = it.sets.filter((x) => x.target?.kind === 'warmup').length;
+  const what = n.si < warm ? `riscaldamento ${n.si + 1}` : `serie ${n.si - warm + 1}`;
+  return `${exercises.nameOf(it.exerciseId)} · ${what}`;
 });
 
 function patch(p: { [K in keyof LoggedSet]?: LoggedSet[K] | undefined }) {

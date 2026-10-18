@@ -73,6 +73,13 @@
         </q-item-section>
       </q-item>
       <q-item tag="label">
+        <q-item-section>
+          <q-item-label>Riscaldamento suggerito</q-item-label>
+          <q-item-label caption>Prima del primo esercizio pesante di ogni muscolo</q-item-label>
+        </q-item-section>
+        <q-item-section side><q-toggle v-model="settings.suggestWarmup" /></q-item-section>
+      </q-item>
+      <q-item tag="label">
         <q-item-section><q-item-label>Suono a fine timer</q-item-label></q-item-section>
         <q-item-section side><q-toggle v-model="settings.sound" /></q-item-section>
       </q-item>

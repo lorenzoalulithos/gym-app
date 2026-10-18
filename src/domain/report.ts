@@ -1,7 +1,7 @@
 import type { BodyField, BodyMetric, Exercise, Session } from '@/db/types';
 import { sessionValue } from './analysis';
 import { addDays, calendarDay, isoWeekday, type CalendarInput } from './calendar';
-import { sessionRecords } from './records';
+import { isWorkSet, sessionRecords } from './records';
 import { sessionStats } from './session';
 
 export interface ExerciseMonthTrend {
@@ -100,7 +100,7 @@ export function monthReport(
     ).count;
     for (const b of s.blocks)
       for (const it of b.items) {
-        const n = it.sets.filter((x) => x.done).length;
+        const n = it.sets.filter(isWorkSet).length;
         for (const m of exercises.get(it.exerciseId)?.primaryMuscles ?? [])
           muscle.set(m, (muscle.get(m) ?? 0) + n);
       }
