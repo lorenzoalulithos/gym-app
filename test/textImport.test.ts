@@ -63,8 +63,8 @@ describe('testo → scheda', () => {
       '# A Push (lunedì)\nPanca piana 4x8\n\nGiorno B - Pull mer\nTrazioni 4x6',
     );
     expect(days.map((d) => [d.name, d.weekday])).toEqual([
-      ['A Push', 1],
-      ['B - Pull', 3],
+      ['Push', 1],
+      ['Pull', 3],
     ]);
   });
 
@@ -157,5 +157,71 @@ describe('nomi classici e righe difficili', () => {
     expect(b[1]!.restSec).toBe(90);
     expect(b[2]!.items[0]).toMatchObject({ raw: 'Crunch' });
     expect(b[2]!.items[0]!.sets).toHaveLength(3);
+  });
+});
+
+describe('casi presi dai messaggi del coach', () => {
+  it('punteggiatura dopo le serie, recuperi in vari formati', () => {
+    const [a, b, c, d] = parseBlocks(
+      "Panca 4x8, rec 90\nRematore 3x10; r1'30\nCurl 3x10-12. 2' rec\nStacco 1x5, 2x3",
+    );
+    expect(a!.items[0]).toMatchObject({ raw: 'Panca' });
+    expect(a!.items[0]!.sets).toHaveLength(4);
+    expect(a!.restSec).toBe(90);
+    expect(b!.restSec).toBe(90);
+    expect(c!.items[0]!.sets[0]!.reps).toEqual({ min: 10, max: 12 });
+    expect(c!.restSec).toBe(120);
+    expect(d!.items[0]!.sets.map((s) => s.reps)).toEqual([5, 3, 3]);
+  });
+
+  it('note tra parentesi, anche con "+" e parentesi annidate; nomi con parentesi', () => {
+    const [a, b] = parseBlocks(
+      'Squat 3x5 @80kg (pausa + fermo)\nFront Squat (Clean Grip) 3x5 (piano (lento))',
+    );
+    expect(a!.type).toBe('single');
+    expect(a!.items[0]).toMatchObject({ raw: 'Squat', notes: 'pausa + fermo' });
+    expect(b!.items[0]).toMatchObject({ raw: 'Front Squat (Clean Grip)', notes: 'piano (lento)' });
+  });
+
+  it('piramidi con carichi diversi e serie a tempo diverse', () => {
+    const [a, b] = parseBlocks('Panca 12@60/10@70/8@80\nSide plank 45s/30s');
+    expect(a!.items[0]!.sets).toEqual([
+      { reps: 12, weightKg: 60 },
+      { reps: 10, weightKg: 70 },
+      { reps: 8, weightKg: 80 },
+    ]);
+    expect(b!.items[0]).toMatchObject({ raw: 'Side plank' });
+    expect(b!.items[0]!.sets.map((s) => s.durationSec)).toEqual([45, 30]);
+  });
+
+  it('massime ripetizioni', () => {
+    const [a] = parseBlocks('Trazioni 4xmax r2:00');
+    expect(a!.items[0]).toMatchObject({ raw: 'Trazioni', notes: 'massime ripetizioni' });
+    expect(a!.items[0]!.sets).toHaveLength(4);
+  });
+
+  it('"panca" da sola è la panca piana', () => {
+    expect(matchExercise('Panca', index).id).toBe('barbell-bench-press-medium-grip');
+  });
+
+  it('andata e ritorno conserva circuiti, recuperi, piramidi e note', () => {
+    const p = JSON.parse(JSON.stringify(program)) as typeof program;
+    const d = p.days[0]!;
+    d.blocks[0]!.type = 'circuit';
+    d.blocks[0]!.items[0]!.restSec = 20;
+    d.blocks[0]!.items[0]!.notes = 'esplosivi (veloci)';
+    d.blocks[4]!.restSec = 0;
+    d.blocks[1]!.items[0]!.sets = [
+      { reps: 12, weightKg: 10 },
+      { reps: 10, weightKg: 12.5 },
+    ];
+    const back = parseProgramText(programToText(p, nameOf));
+    resolveBlocks(back[0]!.blocks, index);
+    const b0 = back[0]!.blocks[0]!;
+    expect(b0.type).toBe('circuit');
+    expect(b0.items[0]).toMatchObject({ restSec: 20, notes: 'esplosivi (veloci)' });
+    expect(back[0]!.blocks[1]!.items[0]!.sets).toEqual(d.blocks[1]!.items[0]!.sets);
+    expect(back[0]!.blocks[4]!.restSec).toBe(0);
+    expect(back[0]!.name).toBe(d.name);
   });
 });

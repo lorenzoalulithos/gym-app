@@ -121,6 +121,7 @@ import TextImportDialog from '../TextImportDialog.vue';
 import ItemRow from './ItemRow.vue';
 import { useWizardProgram } from './context';
 import { useRestPicker } from '@/composables/useRestPicker';
+import { db } from '@/db';
 import { useSortable } from '@/composables/useSortable';
 import {
   defaultSets,
@@ -162,14 +163,17 @@ function addExercises() {
 /** Esercizio personalizzato creato al volo e aggiunto subito al giorno. */
 function createCustom() {
   $q.dialog({ component: ExerciseFormDialog }).onOk((id: string) => {
-    day.value!.blocks.push(newBlock(id, exercises.get(id), settings.defaultRestSec));
+    // il negozio esercizi si aggiorna un attimo dopo: si legge l'esercizio appena salvato
+    void db.exercises.get(id).then((ex) => {
+      day.value!.blocks.push(newBlock(id, ex, settings.defaultRestSec));
+    });
   });
 }
 
 function paste() {
   $q.dialog({ component: TextImportDialog, componentProps: { mode: 'day' } }).onOk(
     (blocks: ParsedBlock[]) => {
-      day.value!.blocks.push(...toProgramBlocks(blocks, settings.defaultRestSec));
+      day.value!.blocks.push(...toProgramBlocks(blocks, settings.defaultRestSec, exercises.byId));
     },
   );
 }

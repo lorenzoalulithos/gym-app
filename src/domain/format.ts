@@ -63,7 +63,8 @@ export function formatTarget(t: SetTarget, ex?: Pick<Exercise, 'perSide'>): stri
 export function summarizeTargets(sets: SetTarget[], ex?: Pick<Exercise, 'perSide'>): string {
   if (sets.length === 0) return '—';
   const labels = sets.map((s) => formatTarget(s, ex));
-  if (labels.every((l) => l === labels[0])) return `${sets.length} × ${labels[0]}`;
+  if (labels.every((l) => l === labels[0]))
+    return labels[0] ? `${sets.length} × ${labels[0]}` : `${sets.length} serie`;
   return labels.join(' · ');
 }
 

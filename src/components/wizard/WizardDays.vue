@@ -84,11 +84,13 @@ import { useSortable } from '@/composables/useSortable';
 import { newId } from '@/db';
 import type { ProgramDay } from '@/db/types';
 import { toProgramBlocks, type ParsedDay } from '@/domain/textImport';
+import { useExercisesStore } from '@/stores/exercises';
 import { useSettingsStore } from '@/stores/settings';
 
 const p = useWizardProgram();
 const $q = useQuasar();
 const settings = useSettingsStore();
+const exercises = useExercisesStore();
 
 const listEl = ref<HTMLElement>();
 useSortable(listEl, () => p.value?.days);
@@ -150,7 +152,7 @@ function pasteProgram() {
           const day: ProgramDay = {
             id: newId(),
             name: d.name,
-            blocks: toProgramBlocks(d.blocks, settings.defaultRestSec),
+            blocks: toProgramBlocks(d.blocks, settings.defaultRestSec, exercises.byId),
           };
           if (d.weekday) day.weekday = d.weekday;
           return day;

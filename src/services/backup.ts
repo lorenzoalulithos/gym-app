@@ -66,6 +66,14 @@ export async function collectData(withAnalysis = true): Promise<BackupData> {
     schedule,
     deloads: (await getMeta<DeloadWindow[]>('deload:windows')) ?? [],
   };
+  if (withAnalysis) {
+    // l'export per l'analisi resta leggero: niente foto degli esercizi (sono nel backup ZIP)
+    data.exercises = exercises.map((e) =>
+      e.images.some((i) => i.startsWith('data:'))
+        ? { ...e, images: e.images.filter((i) => !i.startsWith('data:')) }
+        : e,
+    );
+  }
   if (withAnalysis)
     data.analysis = exerciseTrends(data.sessions, new Map(allExercises.map((e) => [e.id, e])));
   return data;

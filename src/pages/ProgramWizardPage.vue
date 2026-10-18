@@ -74,7 +74,10 @@ import WizardSummary from '@/components/wizard/WizardSummary.vue';
 import { PROGRAM_KEY } from '@/components/wizard/context';
 import { planDeload } from '@/composables/useDeload';
 import { useEditableProgram } from '@/composables/useEditableProgram';
+import { db } from '@/db';
 import { addDays } from '@/domain/calendar';
+import { todayIso } from '@/domain/format';
+import { activeProgram } from '@/domain/session';
 
 const STEPS = ['Scheda', 'Giorni', 'Esercizi', 'Riepilogo'];
 
@@ -127,7 +130,27 @@ const shortDate = (iso: string) =>
 async function finish() {
   const p = program.value!;
   const wasDraft = !!p.draft;
+  const today = todayIso();
+  // una scheda con inizio nel passato (es. importata) parte da oggi, con la stessa durata:
+  // altrimenti i giorni passati risulterebbero saltati, o la scheda già finita
+  if (wasDraft && p.startDate < today) {
+    if (p.endDate) {
+      const span =
+        (new Date(`${p.endDate}T12:00`).getTime() - new Date(`${p.startDate}T12:00`).getTime()) /
+        86400000;
+      p.endDate = addDays(today, Math.round(span));
+    }
+    p.startDate = today;
+  }
   delete p.draft;
+  // la scheda attiva fino a ora si chiude il giorno prima dell'inizio della nuova
+  if (wasDraft) {
+    const others = (await db.programs.toArray()).filter((o) => o.id !== p.id && !o.draft);
+    const prev = activeProgram(others, p.startDate);
+    if (prev && prev.startDate < p.startDate) {
+      await db.programs.update(prev.id, { endDate: addDays(p.startDate, -1) });
+    }
+  }
   if (wasDraft && p.deloadLastWeek && p.endDate) {
     await planDeload({ from: addDays(p.endDate, -6), to: p.endDate });
   }

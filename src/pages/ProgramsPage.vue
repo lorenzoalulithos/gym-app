@@ -168,7 +168,12 @@ function paste(initialText = '') {
 }
 
 async function fromText(days: ParsedDay[]) {
-  const id = await programFromParsed(days, 'Scheda incollata', settings.defaultRestSec);
+  const id = await programFromParsed(
+    days,
+    'Scheda incollata',
+    settings.defaultRestSec,
+    exercises.byId,
+  );
   open(id, 0);
 }
 

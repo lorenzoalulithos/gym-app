@@ -1,5 +1,6 @@
 import type { Block, BlockType, Exercise, Program, ProgramDay, SetTarget } from '@/db/types';
-import { formatDuration, formatReps } from './format';
+import { formatReps } from './format';
+import { defaultSets } from './programEdit';
 
 // Scrivere una scheda come su un foglio, una riga per esercizio:
 //
@@ -18,6 +19,8 @@ export interface ParsedExercise {
   raw: string;
   sets: SetTarget[];
   notes?: string;
+  /** Recupero proprio (esercizi non ultimi di un superset). */
+  restSec?: number;
   /** Esercizio riconosciuto nella libreria (o scelto dall'utente). */
   exerciseId?: string;
   /** Alternative possibili, dalla più probabile. */
@@ -60,16 +63,33 @@ const WEEKDAYS: Record<string, number> = {
 
 const num = (s: string) => Number(s.replace(',', '.'));
 
-/** "90", "1:30", "2'", "2min", "90s" → secondi */
+/** "90", "1:30", "1'30", "2'", "2min", "90s" → secondi */
 function parseSeconds(s: string): number | undefined {
   const t = s.trim().toLowerCase();
-  let m = t.match(/^(\d+):(\d{2})$/);
+  let m = t.match(/^(\d+)[:'](\d{2})"?$/);
   if (m) return Number(m[1]) * 60 + Number(m[2]);
   m = t.match(/^(\d+(?:[.,]\d+)?)\s*(?:'|min|m)$/);
   if (m) return Math.round(num(m[1]!) * 60);
   m = t.match(/^(\d+)\s*(?:"|''|s|sec)?$/);
   if (m) return Number(m[1]);
   return undefined;
+}
+
+const TIME = String.raw`\d+:\d{2}|\d+'\d{2}"?|\d+\s*(?:'|"|min|s|sec)`;
+const W = String.raw`(?:@\s*\d+(?:[.,]\d+)?)`;
+/** fine di una specifica: spazio, punteggiatura o fine riga */
+const END = String.raw`(?=[\s,;.)]|$)`;
+
+/** Una parte di piramide: "12", "12@60", "45s", "1:00@10" */
+function parsePyramidPart(part: string, base: () => SetTarget): SetTarget {
+  const [v, w] = part.split('@').map((x) => x.trim());
+  const t = base();
+  if (w) t.weightKg = num(w);
+  if (/[:'"sm]/i.test(v!)) {
+    const sec = parseSeconds(v!);
+    if (sec !== undefined) t.durationSec = sec;
+  } else t.reps = Number(v);
+  return t;
 }
 
 /** Riconosce le specifiche di un esercizio; restituisce il nome (testo prima delle specifiche). */
@@ -79,18 +99,33 @@ function parseSegment(text: string): {
   restSec?: number;
   notes?: string;
 } {
-  let s = ` ${text.trim()} `;
+  // virgole e punto e virgola separano (es. "Panca 4x8, rec 90"), tranne le virgole decimali
+  let s = ` ${text.trim()} `
+    .replace(/(\d),(\d)/g, '$1§$2')
+    .replace(/[,;]/g, ' ')
+    .replace(/§/g, ',');
+
+  // posizione della prima specifica (serie, piramide o carico): il testo prima è il nome
+  const specRe = new RegExp(
+    String.raw`\s(?:\d+\s*[x×]\s*(?:\d|max|amrap|cedimento)|\d+(?:${W})?(?:\s*\/\s*\d)|${W}|r\s*\d|rec\b)`,
+    'i',
+  );
+  const specAt = s.search(specRe);
+
+  // note: tra parentesi, dopo la prima specifica ("Front Squat (Clean Grip) 3x5 (pausa)")
   let notes: string | undefined;
-  const paren = s.match(/\(([^)]*)\)/);
-  if (paren) {
-    notes = paren[1]!.trim() || undefined;
-    s = s.replace(paren[0], ' ');
+  const open = specAt >= 0 ? s.indexOf('(', specAt) : -1;
+  if (open >= 0) {
+    const close = s.lastIndexOf(')');
+    notes = s.slice(open + 1, close > open ? close : undefined).trim() || undefined;
+    s = `${s.slice(0, open)} ${close > open ? s.slice(close + 1) : ''} `;
   }
 
   let restSec: number | undefined;
-  const rest = s.match(
-    /\s(?:r|rec|recupero|riposo|rest)\s*[:=]?\s*(\d+(?::\d{2})?\s*(?:'|"|min|s|sec)?)(?=\s)/i,
-  );
+  const rest =
+    s.match(
+      new RegExp(String.raw`\s(?:r|rec|recupero|riposo|rest)\s*[:=]?\s*(${TIME}|\d+)${END}`, 'i'),
+    ) ?? s.match(new RegExp(String.raw`\s(${TIME}|\d+)\s*(?:rec|recupero|riposo|rest)\b`, 'i'));
   if (rest) {
     restSec = parseSeconds(rest[1]!);
     s = s.replace(rest[0], ' ');
@@ -103,10 +138,16 @@ function parseSegment(text: string): {
     percent1RM = num(pct[1]!);
     s = s.replace(pct[0], ' ');
   }
-  const kg = s.match(/@\s*(\d+(?:[.,]\d+)?)\s*(?:kg)?|\s(\d+(?:[.,]\d+)?)\s*kg(?=\s)/i);
-  if (kg) {
-    weightKg = num(kg[1] ?? kg[2]!);
-    s = s.replace(kg[0], ' ');
+  // il carico unico vale solo se non c'è una piramide con carichi per serie
+  const pyrWithKg = new RegExp(String.raw`\d${W}\s*\/`).test(s);
+  if (!pyrWithKg) {
+    const kg = s.match(
+      new RegExp(String.raw`@\s*(\d+(?:[.,]\d+)?)\s*(?:kg)?|\s(\d+(?:[.,]\d+)?)\s*kg${END}`, 'i'),
+    );
+    if (kg) {
+      weightKg = num(kg[1] ?? kg[2]!);
+      s = s.replace(kg[0], ' ');
+    }
   }
 
   const base = (): SetTarget => {
@@ -116,37 +157,44 @@ function parseSegment(text: string): {
     return t;
   };
 
-  let sets: SetTarget[] = [];
-  let specStart = -1;
-  // 3x45s, 3x1', 3x1:30
-  const timed = s.match(/\s(\d+)\s*[x×]\s*(\d+:\d{2}|\d+\s*(?:'|"|min|s|sec))(?=\s)/i);
-  // 4x8-10, 4x8
-  const sr = s.match(/\s(\d+)\s*[x×]\s*(\d+)(?:\s*[-–]\s*(\d+))?(?=\s)/i);
-  // piramide 12/10/8/6
-  const pyr = s.match(/\s(\d+(?:\s*\/\s*\d+)+)(?=\s)/);
-  if (timed) {
-    const sec = parseSeconds(timed[2]!);
-    sets = Array.from({ length: Number(timed[1]) }, () => ({ ...base(), durationSec: sec ?? 30 }));
-    specStart = timed.index!;
-  } else if (sr) {
-    const reps: SetTarget['reps'] = sr[3]
-      ? { min: Number(sr[2]), max: Number(sr[3]) }
-      : Number(sr[2]);
-    sets = Array.from({ length: Number(sr[1]) }, () => ({ ...base(), reps }));
-    specStart = sr.index!;
-  } else if (pyr) {
-    sets = pyr[1]!.split('/').map((r) => ({ ...base(), reps: Number(r.trim()) }));
-    specStart = pyr.index!;
+  const sets: SetTarget[] = [];
+  let firstSpec = -1;
+  const mark = (i: number) => (firstSpec = firstSpec < 0 ? i : Math.min(firstSpec, i));
+  // più gruppi sulla stessa riga si sommano: "Stacco 1x5, 2x3"
+  const groupRe = new RegExp(
+    String.raw`\s(\d+)\s*[x×]\s*(?:(${TIME})|(\d+)(?:\s*[-–]\s*(\d+))?|(max|amrap|cedimento))${END}`,
+    'gi',
+  );
+  for (const g of s.matchAll(groupRe)) {
+    mark(g.index);
+    const n = Number(g[1]);
+    for (let i = 0; i < n; i++) {
+      const t = base();
+      if (g[2]) t.durationSec = parseSeconds(g[2]) ?? 30;
+      else if (g[3]) t.reps = g[4] ? { min: Number(g[3]), max: Number(g[4]) } : Number(g[3]);
+      sets.push(t);
+    }
+    if (g[5]) notes = notes ? `${notes} · massime ripetizioni` : 'massime ripetizioni';
+  }
+  if (!sets.length) {
+    // piramide: 12/10/8/6, 12@60/10@70, 45s/30s
+    const part = String.raw`(?:${TIME}|\d+)(?:\s*${W})?`;
+    const pyr = s.match(new RegExp(String.raw`\s(${part}(?:\s*\/\s*${part})+)${END}`, 'i'));
+    if (pyr) {
+      mark(pyr.index!);
+      sets.push(...pyr[1]!.split('/').map((x) => parsePyramidPart(x, base)));
+    }
   }
 
   // il nome è ciò che precede la prima specifica trovata
-  let name = specStart >= 0 ? s.slice(0, specStart) : s;
+  let name = firstSpec >= 0 ? s.slice(0, firstSpec) : s;
   name = name
     .replace(/@.*$/, '')
     .replace(/^\s*(?:[-•*]|\d+[.)]|[a-z]\d?[.)]|\d+[a-z][.)]?)\s+/i, '')
+    .replace(/[.:]\s*$/, '')
     .replace(/\s+/g, ' ')
     .trim();
-  if (!sets.length) sets = [base(), base(), base()];
+  if (!sets.length) sets.push(base(), base(), base());
   const out: { name: string; sets: SetTarget[]; restSec?: number; notes?: string } = { name, sets };
   if (restSec !== undefined) out.restSec = restSec;
   if (notes) out.notes = notes;
@@ -165,13 +213,40 @@ function parseDayHeader(line: string): { name: string; weekday?: number } | null
     weekday = WEEKDAYS[wd[1]!.toLowerCase()];
     name = name
       .replace(wd[0], '')
-      .replace(/[()·,\-–]\s*$/, '')
+      .replace(/[(·,\-–]\s*$/, '')
       .trim();
   }
-  name = name.replace(/^[:\-–·]\s*/, '').trim();
+  // la lettera del giorno ("# A Push", "Giorno B - Pull") la mette già l'app
+  name = name
+    .replace(/^[A-Z](?:\s*[-–·:]\s*|\s+)(?=\S)/, '')
+    .replace(/^[:\-–·]\s*/, '')
+    .trim();
   const out: { name: string; weekday?: number } = { name: name || 'Giorno' };
   if (weekday) out.weekday = weekday;
   return out;
+}
+
+/** Divide "A 3x12 + B 3x12" sui "+" che non sono dentro le parentesi delle note. */
+function splitSuperset(body: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let cur = '';
+  for (let i = 0; i < body.length; i++) {
+    const c = body[i]!;
+    if (c === '(') depth++;
+    if (c === ')') depth = Math.max(0, depth - 1);
+    if (
+      c === '+' &&
+      depth === 0 &&
+      /\s/.test(body[i - 1] ?? ' ') &&
+      /\s/.test(body[i + 1] ?? ' ')
+    ) {
+      parts.push(cur);
+      cur = '';
+    } else cur += c;
+  }
+  parts.push(cur);
+  return parts.map((x) => x.trim()).filter(Boolean);
 }
 
 /** Testo → blocchi di un giorno (le righe "SS ... + ..." o che iniziano con "+" sono superset). */
@@ -181,22 +256,21 @@ export function parseBlocks(text: string): ParsedBlock[] {
     const line = rawLine.trim();
     if (!line || parseDayHeader(line)) continue;
     const joinPrev = line.startsWith('+');
-    const body = line
-      .replace(/^\+\s*/, '')
-      .replace(/^(?:[-•*]|\d+[.)])\s+/, '')
-      .replace(/^(?:ss|superset|circuito|circuit)\s*[:-]?\s*/i, '');
-    const isCircuit = /^(?:circuito|circuit)\b/i.test(line);
-    const parts = body
-      .split(/\s\+\s/)
+    const stripped = line.replace(/^\+\s*/, '').replace(/^(?:[-•*]|\d+[.)])\s+/, '');
+    const isCircuit = /^(?:circuito|circuit)\b/i.test(stripped);
+    const body = stripped.replace(/^(?:ss|superset|circuito|circuit)\s*[:-]?\s*/i, '');
+    const parts = splitSuperset(body)
       .map(parseSegment)
       .filter((p) => p.name);
     if (!parts.length) continue;
-    const items = parts.map((p) => {
+    // il recupero dell'ultimo esercizio è quello di fine giro; gli altri restano dell'esercizio
+    const items = parts.map((p, i) => {
       const it: ParsedExercise = { raw: p.name, sets: p.sets, candidates: [] };
       if (p.notes) it.notes = p.notes;
+      if (p.restSec !== undefined && i < parts.length - 1) it.restSec = p.restSec;
       return it;
     });
-    const restSec = parts.map((p) => p.restSec).find((r) => r !== undefined);
+    const restSec = parts.at(-1)!.restSec;
     const prev = blocks.at(-1);
     if (joinPrev && prev) {
       prev.items.push(...items);
@@ -330,6 +404,7 @@ const COMMON = new Set([
 
 /** Nomi italiani "da palestra" degli esercizi più comuni → esercizio della libreria. */
 const CLASSICS: Record<string, string> = {
+  panca: 'barbell-bench-press-medium-grip',
   'panca piana': 'barbell-bench-press-medium-grip',
   'panca piana bilanciere': 'barbell-bench-press-medium-grip',
   'panca piana manubri': 'dumbbell-bench-press',
@@ -480,10 +555,17 @@ export function matchExercise(
     .filter((x) => x.score > 0.15)
     .sort((a, b) => b.score - a.score);
   const best = scored[0];
+  const second = scored[1];
   const out: { id?: string; candidates: string[] } = {
     candidates: scored.slice(0, 5).map((x) => x.id),
   };
-  if (best && best.score >= 0.45) out.id = best.id;
+  // scelta automatica solo con un vincitore chiaro: nel dubbio decide l'utente
+  if (
+    best &&
+    best.score >= 0.45 &&
+    (!second || best.score >= 0.6 || best.score - second.score >= 0.05)
+  )
+    out.id = best.id;
   return out;
 }
 
@@ -505,7 +587,11 @@ export function resolveBlocks(
 const uid = () => crypto.randomUUID();
 
 /** Blocchi riconosciuti → blocchi della scheda (gli esercizi non risolti vengono saltati). */
-export function toProgramBlocks(blocks: ParsedBlock[], defaultRestSec: number): Block[] {
+export function toProgramBlocks(
+  blocks: ParsedBlock[],
+  defaultRestSec: number,
+  exercises?: Map<string, Exercise>,
+): Block[] {
   return blocks
     .map((b) => ({
       id: uid(),
@@ -514,12 +600,16 @@ export function toProgramBlocks(blocks: ParsedBlock[], defaultRestSec: number): 
       items: b.items
         .filter((it) => it.exerciseId)
         .map((it) => {
-          const item: Block['items'][number] = {
-            id: uid(),
-            exerciseId: it.exerciseId!,
-            sets: it.sets,
-          };
+          // righe con solo il nome: serie predefinite (3×10 o 3×30s a seconda dell'esercizio)
+          const empty = it.sets.every((t) => t.reps === undefined && t.durationSec === undefined);
+          const isMax = it.notes?.includes('massime ripetizioni');
+          const sets =
+            empty && !isMax
+              ? it.sets.map((t) => ({ ...defaultSets(exercises?.get(it.exerciseId!))[0]!, ...t }))
+              : it.sets;
+          const item: Block['items'][number] = { id: uid(), exerciseId: it.exerciseId!, sets };
           if (it.notes) item.notes = it.notes;
+          if (it.restSec !== undefined) item.restSec = it.restSec;
           return item;
         }),
     }))
@@ -554,32 +644,46 @@ function setsToText(sets: SetTarget[]): string {
       : '';
   if (same && first.durationSec) {
     const d = first.durationSec;
-    return `${work.length}x${d % 60 === 0 && d >= 60 ? `${d / 60}'` : `${d}s`}${load}`;
+    return `${work.length}x${timeText(d)}${load}`;
   }
   if (same && first.reps !== undefined) return `${work.length}x${formatReps(first.reps)}${load}`;
-  if (work.every((s) => typeof s.reps === 'number'))
-    return `${work.map((s) => formatReps(s.reps!)).join('/')}${load}`;
-  return work
-    .map((s) => (s.durationSec ? formatDuration(s.durationSec) : formatReps(s.reps ?? 0)))
-    .join('/');
+  // serie diverse: una per una, ognuna col suo carico ("12@60/10@70/8@80", "45s/30s")
+  const sameLoad = work.every(
+    (s) => s.weightKg === first.weightKg && s.percent1RM === first.percent1RM,
+  );
+  const one = (s: SetTarget) => {
+    const v = s.durationSec ? timeText(s.durationSec) : formatReps(s.reps ?? 0);
+    return sameLoad || !s.weightKg ? v : `${v}@${s.weightKg}`;
+  };
+  return `${work.map(one).join('/')}${sameLoad ? load : ''}`;
 }
 
+const timeText = (d: number) =>
+  d >= 60 ? `${Math.floor(d / 60)}:${String(d % 60).padStart(2, '0')}` : `${d}s`;
+
 const restText = (sec: number) =>
-  sec % 60 === 0
-    ? `${sec / 60}:00`
-    : sec > 60
-      ? `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`
-      : `${sec}`;
+  sec === 0
+    ? '0'
+    : sec % 60 === 0
+      ? `${sec / 60}:00`
+      : sec > 60
+        ? `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`
+        : `${sec}`;
 
 export function dayToText(day: ProgramDay, nameOf: (id: string) => string): string {
   return day.blocks
     .map((b) => {
-      const parts = b.items.map((it) => {
+      const parts = b.items.map((it, ii) => {
         const notes = it.notes ? ` (${it.notes})` : '';
-        return `${nameOf(it.exerciseId)} ${setsToText(it.sets)}${notes}`.trim();
+        // recupero proprio degli esercizi non ultimi di un superset
+        const own =
+          it.restSec !== undefined && ii < b.items.length - 1 ? ` r${restText(it.restSec)}` : '';
+        return `${nameOf(it.exerciseId)} ${setsToText(it.sets)}${own}${notes}`.trim();
       });
-      const rest = b.restSec ? ` r${restText(b.restSec)}` : '';
-      return b.items.length > 1 ? `SS ${parts.join(' + ')}${rest}` : `${parts[0]}${rest}`;
+      const lastOwn = b.items.at(-1)?.restSec;
+      const rest = ` r${restText(lastOwn ?? b.restSec)}`;
+      if (b.items.length === 1) return `${parts[0]}${rest}`;
+      return `${b.type === 'circuit' ? 'CIRCUITO' : 'SS'} ${parts.join(' + ')}${rest}`;
     })
     .join('\n');
 }

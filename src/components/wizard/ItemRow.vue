@@ -86,7 +86,7 @@
         :label="isTime ? 'tempo' : 'ripetizioni'"
         :error="repsError"
         hide-bottom-space
-        @update:model-value="(v) => (reps = String(v ?? ''))"
+        @update:model-value="onReps"
         @blur="commitReps"
         @keyup.enter="commitReps"
       />
@@ -188,6 +188,12 @@ watch(
   (v) => (reps.value = v),
   { immediate: true },
 );
+
+/** Si applica mentre si scrive (se il valore è valido): nulla si perde uscendo dalla pagina. */
+function onReps(v: string | number | null) {
+  reps.value = String(v ?? '');
+  if (item.value && applyRepsText(item.value, reps.value)) repsError.value = false;
+}
 
 function commitReps() {
   if (!item.value) return;

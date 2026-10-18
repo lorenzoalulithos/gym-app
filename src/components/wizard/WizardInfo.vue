@@ -27,7 +27,8 @@
         />
       </div>
       <q-input
-        v-model="p.startDate"
+        :model-value="p.startDate"
+        @update:model-value="(v) => v && (p!.startDate = String(v))"
         outlined
         dense
         type="date"

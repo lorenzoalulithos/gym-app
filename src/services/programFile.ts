@@ -104,7 +104,7 @@ export async function readProgramFile(file: File): Promise<ReadResult> {
         app: 'gym-app',
         kind: 'program',
         version: 1,
-        program: data.programs.at(-1)!,
+        program: [...data.programs].sort((a, b) => a.startDate.localeCompare(b.startDate)).at(-1)!,
         exercises: (data as { exercises?: Exercise[] }).exercises ?? [],
       },
     };
@@ -135,6 +135,7 @@ export async function programFromParsed(
   days: ParsedDay[],
   name: string,
   restSec: number,
+  exercises?: Map<string, Exercise>,
 ): Promise<string> {
   const p: Program = {
     id: newId(),
@@ -147,7 +148,7 @@ export async function programFromParsed(
       const day: Program['days'][number] = {
         id: newId(),
         name: d.name,
-        blocks: toProgramBlocks(d.blocks, restSec),
+        blocks: toProgramBlocks(d.blocks, restSec, exercises),
       };
       if (d.weekday) day.weekday = d.weekday;
       return day;
