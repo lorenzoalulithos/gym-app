@@ -41,7 +41,8 @@ export function compareWithLast(
     const ex = exercises.get(id);
     if (!ex) continue;
     const cur = sessionValue(session, ex);
-    if (!cur) continue;
+    // senza carico registrato (es. peso non segnato) non c'è niente da confrontare
+    if (!cur || cur.value <= 0) continue;
     const prevSession = history.find(
       (h) => !h.deload && h.exerciseIds.includes(id) && sessionValue(h, ex),
     );

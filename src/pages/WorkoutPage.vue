@@ -19,6 +19,14 @@
           v-if="mode === 'view'"
           flat
           round
+          icon="ios_share"
+          aria-label="Condividi riepilogo"
+          @click="openShare"
+        />
+        <q-btn
+          v-if="mode === 'view'"
+          flat
+          round
           icon="edit"
           aria-label="Modifica"
           @click="editing = true"
@@ -221,6 +229,8 @@ import ExerciseCard from '@/components/ExerciseCard.vue';
 import ExercisePicker from '@/components/ExercisePicker.vue';
 import FinishDialog from '@/components/FinishDialog.vue';
 import FocusView from '@/components/FocusView.vue';
+import ShareDialog from '@/components/ShareDialog.vue';
+import type { ShareCardData } from '@/services/shareCard';
 import TimerBar from '@/components/TimerBar.vue';
 import WorkOverlay from '@/components/WorkOverlay.vue';
 import { useRestPicker } from '@/composables/useRestPicker';
@@ -393,6 +403,43 @@ async function saveFinished(data: { difficulty?: number; notes?: string }) {
     icon: n ? 'workspace_premium' : 'check_circle',
     color: n ? 'warning' : 'positive',
     textColor: 'dark',
+    timeout: 5000,
+    actions: [{ label: 'Condividi', color: 'dark', handler: openShare }],
+  });
+}
+
+/** Immagine di riepilogo: numeri della sessione e dove hai spinto di più. */
+function openShare() {
+  const cur = s.value;
+  if (!cur) return;
+  // prima i miglioramenti, poi i confronti, infine gli esercizi nuovi
+  const ups = progress.value.filter((p) => (p.deltaPct ?? 0) > 2);
+  const compared = progress.value.filter((p) => p.deltaPct !== null);
+  const picks = (ups.length ? ups : compared.length ? compared : progress.value).slice(0, 3);
+  const data: ShareCardData = {
+    title: cur.title,
+    dateLabel: new Date(`${cur.date}T12:00`).toLocaleDateString('it-IT', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+    }),
+    minutes: stats.value.minutes,
+    sets: stats.value.sets,
+    volumeKg: stats.value.volume,
+    records: records.value?.count ?? 0,
+    deload: !!cur.deload,
+    highlights: picks.map((p) => ({
+      name: p.name,
+      detail:
+        p.before !== null
+          ? `${fmtMetric(p.metric, p.before)} → ${fmtMetric(p.metric, p.now)}`
+          : `prima volta · ${fmtMetric(p.metric, p.now)}`,
+      deltaPct: p.deltaPct,
+    })),
+  };
+  $q.dialog({
+    component: ShareDialog,
+    componentProps: { data, filename: `gym-${cur.date}.png` },
   });
 }
 
