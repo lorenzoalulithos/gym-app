@@ -180,6 +180,12 @@ export default defineConfig((/* ctx */) => {
       // Service worker scritto a mano (src-pwa/sw/custom-sw.ts): precache, cache immagini
       // e promemoria allenamenti con Periodic Background Sync.
       workboxMode: 'InjectManifest',
+      extendPWAManifestJson(json) {
+        // Quasar di default aggiunge display_override: ['fullscreen', ...], che su Android
+        // nasconde la barra di stato (ora, batteria, notifiche): vogliamo l'app normale.
+        json.display = 'standalone';
+        delete json.display_override;
+      },
       extendPWAInjectManifestOptions(cfg) {
         // Le ~1400 immagini degli esercizi non vanno nella precache:
         // vengono salvate alla prima visualizzazione (e precaricate per la scheda attiva).
