@@ -9,7 +9,7 @@ import { clientsClaim } from 'workbox-core';
 import { ExpirationPlugin } from 'workbox-expiration';
 import { CacheableResponsePlugin } from 'workbox-cacheable-response';
 import { NavigationRoute, registerRoute } from 'workbox-routing';
-import { CacheFirst } from 'workbox-strategies';
+import { CacheFirst, NetworkFirst } from 'workbox-strategies';
 import {
   cleanupOutdatedCaches,
   createHandlerBoundToURL,
@@ -41,6 +41,13 @@ registerRoute(
       new ExpirationPlugin({ maxEntries: 3000 }),
     ],
   }),
+);
+
+// Manifest e icone: prima la rete (così un logo o un'impostazione nuovi arrivano subito),
+// la copia in cache solo offline.
+registerRoute(
+  ({ url }) => url.pathname.endsWith('/manifest.json') || url.pathname.includes('/icons/'),
+  new NetworkFirst({ cacheName: 'app-shell-meta', networkTimeoutSeconds: 3 }),
 );
 
 if (import.meta.env.QUASAR_PROD) {
@@ -103,7 +110,7 @@ self.addEventListener('notificationclick', (event) => {
       if (client) {
         await client.focus();
         if (event.notification.tag === REMINDER_TAG && 'navigate' in client) {
-          await (client).navigate(`${self.registration.scope}#/`);
+          await client.navigate(`${self.registration.scope}#/`);
         }
       } else {
         await self.clients.openWindow(`${self.registration.scope}#/`);

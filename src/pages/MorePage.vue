@@ -118,6 +118,7 @@
     </div>
 
     <div class="text-caption text-muted text-center q-mt-xl">
+      Versione {{ build }}<br />
       Libreria esercizi e immagini: free-exercise-db (Unlicense)
     </div>
 
@@ -149,6 +150,7 @@ const $q = useQuasar();
 const settings = useSettingsStore();
 const workout = useWorkoutStore();
 const busy = ref(false);
+const build = __APP_BUILD__;
 const fileInput = ref<HTMLInputElement>();
 const persisted = ref<boolean | null>(null);
 const usage = ref('');

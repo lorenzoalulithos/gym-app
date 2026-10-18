@@ -52,6 +52,10 @@ export default defineConfig((/* ctx */) => {
       publicPath: process.env.PUBLIC_PATH || '/',
       // define: {},
       // defineEnv: {}
+      // data della build, mostrata in Altro per capire se il telefono ha l'ultima versione
+      define: {
+        __APP_BUILD__: JSON.stringify(new Date().toISOString().slice(0, 16).replace('T', ' ')),
+      },
       // ignorePublicFolder: true,
       // minify: false,
       // distDir
@@ -189,7 +193,9 @@ export default defineConfig((/* ctx */) => {
       extendPWAInjectManifestOptions(cfg) {
         // Le ~1400 immagini degli esercizi non vanno nella precache:
         // vengono salvate alla prima visualizzazione (e precaricate per la scheda attiva).
-        cfg.globIgnores = [...(cfg.globIgnores ?? []), 'exercises/**'];
+        // Manifest e icone fuori dalla precache: Android li rilegge all'installazione e devono
+        // arrivare dalla rete, altrimenti un service worker vecchio serve logo e impostazioni vecchie.
+        cfg.globIgnores = [...(cfg.globIgnores ?? []), 'exercises/**', 'manifest.json', 'icons/**'];
         cfg.maximumFileSizeToCacheInBytes = 4 * 1024 * 1024;
       },
       // extendPWASwTsConfig (tsConfig) {}

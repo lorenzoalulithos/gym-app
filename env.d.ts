@@ -13,3 +13,6 @@
  * }
  */
 interface ImportMetaEnv {}
+
+/** Data/ora (UTC) della build, iniettata da quasar.config.ts */
+declare const __APP_BUILD__: string;
