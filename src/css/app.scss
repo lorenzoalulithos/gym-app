@@ -37,3 +37,154 @@ body {
   max-width: 720px;
   margin: 0 auto;
 }
+
+// --- Animazioni -----------------------------------------------------------
+// Brevi e leggere: danno continuità senza rallentare l'uso in palestra.
+
+$ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+
+// cambio pagina tra le tab
+.page-enter-active {
+  transition:
+    opacity 0.18s ease-out,
+    transform 0.22s $ease-out;
+}
+.page-leave-active {
+  transition: opacity 0.1s ease-in;
+}
+.page-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+.page-leave-to {
+  opacity: 0;
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.15s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+// l'allenamento sale dal basso come un foglio
+.sheet-up-enter-active {
+  transition:
+    transform 0.32s $ease-out,
+    opacity 0.2s ease-out;
+}
+.sheet-up-leave-active {
+  transition:
+    transform 0.2s ease-in,
+    opacity 0.15s ease-in;
+}
+.sheet-up-enter-from {
+  transform: translateY(40px);
+  opacity: 0;
+}
+.sheet-up-leave-to {
+  transform: translateY(24px);
+  opacity: 0;
+}
+
+// cambio serie in modalità focus
+.set-next-enter-active,
+.set-prev-enter-active {
+  transition:
+    transform 0.26s $ease-out,
+    opacity 0.2s ease-out;
+}
+.set-next-leave-active,
+.set-prev-leave-active {
+  transition:
+    transform 0.14s ease-in,
+    opacity 0.12s ease-in;
+}
+.set-next-enter-from,
+.set-prev-leave-to {
+  transform: translateX(48px);
+  opacity: 0;
+}
+.set-next-leave-to,
+.set-prev-enter-from {
+  transform: translateX(-48px);
+  opacity: 0;
+}
+
+// comparsa di riquadri (recupero, suggerimenti)
+.pop-enter-active {
+  transition:
+    transform 0.28s $ease-out,
+    opacity 0.2s ease-out;
+}
+.pop-leave-active {
+  transition:
+    transform 0.16s ease-in,
+    opacity 0.14s ease-in;
+}
+.pop-enter-from,
+.pop-leave-to {
+  transform: scale(0.96);
+  opacity: 0;
+}
+
+// entrata a cascata dei blocchi di una pagina
+.stagger > * {
+  animation: rise 0.36s $ease-out both;
+}
+@for $i from 1 through 10 {
+  .stagger > *:nth-child(#{$i}) {
+    animation-delay: #{($i - 1) * 40}ms;
+  }
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
+// spunta di una serie: piccolo "salto"
+@keyframes check-pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.22);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.check-pop {
+  animation: check-pop 0.32s $ease-out;
+}
+
+// feedback al tocco su bottoni e card cliccabili
+.q-btn,
+.card[class*='cursor'],
+.cell,
+.day-dot,
+.todo-row {
+  transition:
+    transform 0.08s ease,
+    background-color 0.2s ease;
+}
+.q-btn:active:not(.disabled),
+.cell:active,
+.day-dot:active {
+  transform: scale(0.96);
+}
+
+// chi ha chiesto meno movimento nelle impostazioni del telefono non vede animazioni
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 1ms !important;
+  }
+}

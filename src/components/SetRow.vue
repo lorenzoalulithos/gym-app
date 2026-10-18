@@ -62,6 +62,7 @@
       :color="set.done ? 'primary' : 'grey-9'"
       :text-color="set.done ? 'dark' : 'grey-5'"
       icon="check"
+      :class="{ 'check-pop': set.done }"
       class="action"
       :aria-label="set.done ? 'Segna come non fatta' : 'Segna come fatta'"
       @click="emit('toggle')"

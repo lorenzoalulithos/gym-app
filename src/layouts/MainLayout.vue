@@ -1,7 +1,11 @@
 <template>
   <q-layout view="hHh lpR fFf">
     <q-page-container>
-      <router-view />
+      <router-view #default="{ Component, route }">
+        <transition name="page" mode="out-in">
+          <component :is="Component" :key="route.path" />
+        </transition>
+      </router-view>
     </q-page-container>
 
     <q-footer class="nav-footer">

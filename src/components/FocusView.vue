@@ -19,175 +19,182 @@
     />
 
     <!-- Recupero in corso -->
-    <div v-if="timer.rest" class="card rest-card q-pa-md q-mb-md text-center">
-      <div class="section-label">Recupero</div>
-      <div class="rest-big tabular">{{ formatClock(timer.restLeft) }}</div>
-      <div class="row justify-center q-gutter-sm">
-        <q-btn outline rounded no-caps label="-15" @click="timer.addRest(-15)" />
-        <q-btn outline rounded no-caps label="+15" @click="timer.addRest(15)" />
+    <transition name="pop">
+      <div v-if="timer.rest" class="card rest-card q-pa-md q-mb-md text-center">
+        <div class="section-label">Recupero</div>
+        <div class="rest-big tabular">{{ formatClock(timer.restLeft) }}</div>
+        <div class="row justify-center q-gutter-sm">
+          <q-btn outline rounded no-caps label="-15" @click="timer.addRest(-15)" />
+          <q-btn outline rounded no-caps label="+15" @click="timer.addRest(15)" />
+          <q-btn
+            unelevated
+            rounded
+            no-caps
+            color="primary"
+            text-color="dark"
+            icon="skip_next"
+            label="Vai"
+            @click="timer.stopRest()"
+          />
+        </div>
+      </div>
+    </transition>
+
+    <transition :name="slideName" mode="out-in">
+      <!-- Tutto fatto -->
+      <div v-if="!cur" key="done" class="card q-pa-lg text-center">
+        <div class="text-h4 q-mb-sm">🎉</div>
+        <div class="text-h6">Hai finito tutte le serie</div>
+        <div class="text-muted q-mb-md">
+          Salva l'allenamento per vedere il riepilogo e i record.
+        </div>
         <q-btn
           unelevated
-          rounded
           no-caps
+          size="lg"
           color="primary"
           text-color="dark"
-          icon="skip_next"
-          label="Vai"
-          @click="timer.stopRest()"
+          icon="check"
+          label="Salva allenamento"
+          class="full-width big-btn"
+          @click="emit('finish')"
         />
-      </div>
-    </div>
-
-    <!-- Tutto fatto -->
-    <div v-if="!cur" class="card q-pa-lg text-center">
-      <div class="text-h4 q-mb-sm">🎉</div>
-      <div class="text-h6">Hai finito tutte le serie</div>
-      <div class="text-muted q-mb-md">Salva l'allenamento per vedere il riepilogo e i record.</div>
-      <q-btn
-        unelevated
-        no-caps
-        size="lg"
-        color="primary"
-        text-color="dark"
-        icon="check"
-        label="Salva allenamento"
-        class="full-width big-btn"
-        @click="emit('finish')"
-      />
-      <q-btn
-        flat
-        no-caps
-        color="grey-5"
-        icon="add"
-        label="Aggiungi un esercizio"
-        class="q-mt-sm"
-        @click="emit('add')"
-      />
-    </div>
-
-    <template v-else-if="ex && item && set">
-      <!-- Esercizio -->
-      <div class="row items-center no-wrap q-mb-sm" @click="showInfo">
-        <ExerciseImage :src="ex.images" :alt="ex.name" size="84px" animate class="q-mr-md" />
-        <div class="col" style="min-width: 0">
-          <div class="ex-name">{{ ex.name }}</div>
-          <div v-if="ex.nameIt" class="text-caption text-muted ellipsis">{{ ex.nameIt }}</div>
-        </div>
-      </div>
-
-      <WarmupSuggestion :bi="cur.bi" :ii="cur.ii" />
-
-      <div class="row items-baseline q-mb-xs">
-        <div class="col text-h6">
-          <template v-if="isWarmup">
-            <span class="text-warning">Riscaldamento {{ cur.si + 1 }}</span>
-            <span class="text-muted"> di {{ warmupCount }}</span>
-          </template>
-          <template v-else>
-            Serie {{ cur.si - warmupCount + 1 }}
-            <span class="text-muted">di {{ item.sets.length - warmupCount }}</span>
-          </template>
-        </div>
-        <q-chip
-          dense
-          outline
-          clickable
-          icon="timer"
-          color="grey-6"
-          :label="restLabel"
-          class="q-mr-none"
-          @click="editRest"
-        />
-      </div>
-      <div class="hints q-mb-md">
-        <div v-if="set.target">
-          <span class="text-muted">{{ isWarmup ? 'Obiettivo' : 'Scheda' }}</span>
-          {{ formatTarget(set.target, ex) }}
-        </div>
-        <div v-if="lastSet">
-          <span class="text-muted">Ultima volta</span> {{ formatSet(lastSet, ex) }}
-        </div>
-        <div v-if="item.notes" class="text-warning">{{ item.notes }}</div>
-      </div>
-
-      <!-- Valori -->
-      <div class="big-fields q-gutter-y-sm">
-        <NumberField
-          v-if="showWeight"
-          :model-value="set.weightKg"
-          :step="ex.loadMode === 'total' || ex.loadMode === 'stack' ? 2.5 : 1"
-          :unit="LOAD_MODES[ex.loadMode]"
-          label="Carico (kg)"
-          @update:model-value="(v) => patch({ weightKg: v })"
-        />
-        <NumberField
-          v-if="showTime"
-          :model-value="set.durationSec"
-          :step="5"
-          kind="time"
-          :unit="ex.perSide ? 'tempo per lato' : 'tempo'"
-          label="Durata"
-          @update:model-value="(v) => patch({ durationSec: v })"
-        />
-        <NumberField
-          v-if="showReps"
-          :model-value="set.reps"
-          :unit="ex.perSide ? 'ripetizioni per lato' : 'ripetizioni'"
-          label="Ripetizioni"
-          @update:model-value="(v) => patch({ reps: v })"
-        />
-      </div>
-
-      <!-- Azioni -->
-      <q-btn
-        v-if="showTime && !set.done"
-        unelevated
-        no-caps
-        size="lg"
-        color="secondary"
-        icon="play_arrow"
-        label="Avvia timer"
-        class="full-width big-btn q-mt-md"
-        @click="startTimer"
-      />
-      <q-btn
-        unelevated
-        no-caps
-        size="xl"
-        :color="set.done ? 'grey-9' : 'primary'"
-        :text-color="set.done ? 'grey-4' : 'dark'"
-        :icon="set.done ? 'undo' : 'check'"
-        :label="set.done ? 'Fatta · annulla' : 'Fatto'"
-        class="full-width done-btn q-mt-md"
-        @click="toggle"
-      />
-
-      <div class="row items-center q-mt-md">
         <q-btn
           flat
           no-caps
           color="grey-5"
-          icon="chevron_left"
-          label="Prec."
-          :disable="index <= 0"
-          @click="go(-1)"
-        />
-        <q-space />
-        <div v-if="nextLabel" class="text-caption text-muted ellipsis next-label">
-          Poi: {{ nextLabel }}
-        </div>
-        <q-space />
-        <q-btn
-          flat
-          no-caps
-          color="grey-5"
-          icon-right="chevron_right"
-          label="Succ."
-          :disable="index >= order.length - 1"
-          @click="go(1)"
+          icon="add"
+          label="Aggiungi un esercizio"
+          class="q-mt-sm"
+          @click="emit('add')"
         />
       </div>
-    </template>
+
+      <div v-else-if="ex && item && set" :key="`${cur.bi}-${cur.ii}-${cur.si}`">
+        <!-- Esercizio -->
+        <div class="row items-center no-wrap q-mb-sm" @click="showInfo">
+          <ExerciseImage :src="ex.images" :alt="ex.name" size="84px" animate class="q-mr-md" />
+          <div class="col" style="min-width: 0">
+            <div class="ex-name">{{ ex.name }}</div>
+            <div v-if="ex.nameIt" class="text-caption text-muted ellipsis">{{ ex.nameIt }}</div>
+          </div>
+        </div>
+
+        <WarmupSuggestion :bi="cur.bi" :ii="cur.ii" />
+
+        <div class="row items-baseline q-mb-xs">
+          <div class="col text-h6">
+            <template v-if="isWarmup">
+              <span class="text-warning">Riscaldamento {{ cur.si + 1 }}</span>
+              <span class="text-muted"> di {{ warmupCount }}</span>
+            </template>
+            <template v-else>
+              Serie {{ cur.si - warmupCount + 1 }}
+              <span class="text-muted">di {{ item.sets.length - warmupCount }}</span>
+            </template>
+          </div>
+          <q-chip
+            dense
+            outline
+            clickable
+            icon="timer"
+            color="grey-6"
+            :label="restLabel"
+            class="q-mr-none"
+            @click="editRest"
+          />
+        </div>
+        <div class="hints q-mb-md">
+          <div v-if="set.target">
+            <span class="text-muted">{{ isWarmup ? 'Obiettivo' : 'Scheda' }}</span>
+            {{ formatTarget(set.target, ex) }}
+          </div>
+          <div v-if="lastSet">
+            <span class="text-muted">Ultima volta</span> {{ formatSet(lastSet, ex) }}
+          </div>
+          <div v-if="item.notes" class="text-warning">{{ item.notes }}</div>
+        </div>
+
+        <!-- Valori -->
+        <div class="big-fields q-gutter-y-sm">
+          <NumberField
+            v-if="showWeight"
+            :model-value="set.weightKg"
+            :step="ex.loadMode === 'total' || ex.loadMode === 'stack' ? 2.5 : 1"
+            :unit="LOAD_MODES[ex.loadMode]"
+            label="Carico (kg)"
+            @update:model-value="(v) => patch({ weightKg: v })"
+          />
+          <NumberField
+            v-if="showTime"
+            :model-value="set.durationSec"
+            :step="5"
+            kind="time"
+            :unit="ex.perSide ? 'tempo per lato' : 'tempo'"
+            label="Durata"
+            @update:model-value="(v) => patch({ durationSec: v })"
+          />
+          <NumberField
+            v-if="showReps"
+            :model-value="set.reps"
+            :unit="ex.perSide ? 'ripetizioni per lato' : 'ripetizioni'"
+            label="Ripetizioni"
+            @update:model-value="(v) => patch({ reps: v })"
+          />
+        </div>
+
+        <!-- Azioni -->
+        <q-btn
+          v-if="showTime && !set.done"
+          unelevated
+          no-caps
+          size="lg"
+          color="secondary"
+          icon="play_arrow"
+          label="Avvia timer"
+          class="full-width big-btn q-mt-md"
+          @click="startTimer"
+        />
+        <q-btn
+          unelevated
+          no-caps
+          size="xl"
+          :color="set.done ? 'grey-9' : 'primary'"
+          :text-color="set.done ? 'grey-4' : 'dark'"
+          :icon="set.done ? 'undo' : 'check'"
+          :label="set.done ? 'Fatta · annulla' : 'Fatto'"
+          class="full-width done-btn q-mt-md"
+          :class="{ 'check-pop': set.done }"
+          @click="toggle"
+        />
+
+        <div class="row items-center q-mt-md">
+          <q-btn
+            flat
+            no-caps
+            color="grey-5"
+            icon="chevron_left"
+            label="Prec."
+            :disable="index <= 0"
+            @click="go(-1)"
+          />
+          <q-space />
+          <div v-if="nextLabel" class="text-caption text-muted ellipsis next-label">
+            Poi: {{ nextLabel }}
+          </div>
+          <q-space />
+          <q-btn
+            flat
+            no-caps
+            color="grey-5"
+            icon-right="chevron_right"
+            label="Succ."
+            :disable="index >= order.length - 1"
+            @click="go(1)"
+          />
+        </div>
+      </div>
+    </transition>
   </div>
 </template>
 
@@ -230,6 +237,13 @@ const doneCount = computed(
 const manual = ref<number | null>(null);
 const index = computed(() => manual.value ?? (s.value ? firstUndone(s.value, order.value) : -1));
 const cur = computed(() => (index.value >= 0 ? order.value[index.value] : undefined));
+
+// la serie successiva entra da destra, tornando indietro da sinistra
+const slideName = ref('set-next');
+watch(
+  index,
+  (now, before) => (slideName.value = now < before && now >= 0 ? 'set-prev' : 'set-next'),
+);
 
 // se cambiano gli esercizi (aggiunti/rimossi) l'indice manuale non è più affidabile
 watch(

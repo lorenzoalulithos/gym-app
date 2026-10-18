@@ -1,5 +1,5 @@
 <template>
-  <q-page class="page-pad">
+  <q-page class="page-pad stagger">
     <div class="row items-center q-mb-sm q-mt-sm">
       <q-btn flat round dense icon="chevron_left" aria-label="Mese precedente" @click="shift(-1)" />
       <div class="text-h6 text-weight-bold col text-center month-title">

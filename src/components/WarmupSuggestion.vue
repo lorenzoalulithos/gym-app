@@ -1,37 +1,39 @@
 <template>
-  <div v-if="visible" class="warmup q-pa-sm q-mb-sm">
-    <div class="row items-center no-wrap">
-      <q-icon name="local_fire_department" color="warning" size="20px" class="q-mr-sm" />
-      <div class="col text-weight-bold">Riscaldamento suggerito</div>
+  <transition name="pop">
+    <div v-if="visible" class="warmup q-pa-sm q-mb-sm">
+      <div class="row items-center no-wrap">
+        <q-icon name="local_fire_department" color="warning" size="20px" class="q-mr-sm" />
+        <div class="col text-weight-bold">Riscaldamento suggerito</div>
+      </div>
+      <div class="sets tabular q-my-xs">
+        <span v-for="(s, i) in sets" :key="i">{{ fmt(s.weightKg) }} × {{ s.reps }}</span>
+      </div>
+      <div class="text-caption text-muted">
+        Rampa verso {{ fmt(workKg) }} {{ unit }}: poche ripetizioni, non deve stancare.
+      </div>
+      <div class="row justify-end q-gutter-sm q-mt-xs">
+        <q-btn
+          flat
+          dense
+          no-caps
+          color="grey-5"
+          label="No, grazie"
+          @click="workout.dismissWarmup(itemId)"
+        />
+        <q-btn
+          unelevated
+          dense
+          no-caps
+          color="warning"
+          text-color="dark"
+          icon="add"
+          label="Aggiungi"
+          class="q-px-sm"
+          @click="workout.addWarmup(bi, ii, sets)"
+        />
+      </div>
     </div>
-    <div class="sets tabular q-my-xs">
-      <span v-for="(s, i) in sets" :key="i">{{ fmt(s.weightKg) }} × {{ s.reps }}</span>
-    </div>
-    <div class="text-caption text-muted">
-      Rampa verso {{ fmt(workKg) }} {{ unit }}: poche ripetizioni, non deve stancare.
-    </div>
-    <div class="row justify-end q-gutter-sm q-mt-xs">
-      <q-btn
-        flat
-        dense
-        no-caps
-        color="grey-5"
-        label="No, grazie"
-        @click="workout.dismissWarmup(itemId)"
-      />
-      <q-btn
-        unelevated
-        dense
-        no-caps
-        color="warning"
-        text-color="dark"
-        icon="add"
-        label="Aggiungi"
-        class="q-px-sm"
-        @click="workout.addWarmup(bi, ii, sets)"
-      />
-    </div>
-  </div>
+  </transition>
 </template>
 
 <script setup lang="ts">

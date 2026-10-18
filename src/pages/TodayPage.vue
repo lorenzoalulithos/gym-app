@@ -1,5 +1,5 @@
 <template>
-  <q-page class="page-pad home">
+  <q-page class="page-pad home stagger">
     <!-- Data, serie di settimane e settimana in corso -->
     <div class="row items-center q-mt-xs q-mb-sm">
       <div class="col text-caption text-muted text-uppercase text-weight-bold">

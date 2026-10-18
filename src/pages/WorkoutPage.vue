@@ -218,6 +218,7 @@
       <TimerBar :started-at="s.startedAt" :hide-rest="settings.focusMode" @finish="finish" />
     </q-footer>
     <WorkOverlay @stop="onWorkStopped" />
+    <StartSplash v-if="splash" :title="s?.title ?? ''" :subtitle="splashSub" />
   </q-layout>
 </template>
 
@@ -230,6 +231,7 @@ import ExercisePicker from '@/components/ExercisePicker.vue';
 import FinishDialog from '@/components/FinishDialog.vue';
 import FocusView from '@/components/FocusView.vue';
 import ShareDialog from '@/components/ShareDialog.vue';
+import StartSplash from '@/components/StartSplash.vue';
 import type { ShareCardData } from '@/services/shareCard';
 import TimerBar from '@/components/TimerBar.vue';
 import WorkOverlay from '@/components/WorkOverlay.vue';
@@ -262,6 +264,14 @@ const editing = ref(false);
 const mode = computed<'live' | 'edit' | 'view'>(() =>
   s.value?.status === 'active' ? 'live' : editing.value ? 'edit' : 'view',
 );
+
+const splash = ref(false);
+const splashSub = computed(() => {
+  const n = s.value?.blocks.reduce((k, b) => k + b.items.length, 0) ?? 0;
+  const sets =
+    s.value?.blocks.reduce((k, b) => k + b.items.reduce((m, i) => m + i.sets.length, 0), 0) ?? 0;
+  return n ? `${n} esercizi · ${sets} serie` : '';
+});
 
 const lastByExercise = shallowRef(new Map<string, SessionItem>());
 const records = shallowRef<SessionRecords>();
@@ -303,6 +313,8 @@ watch(
   async (id) => {
     const loaded = await workout.load(id);
     if (!loaded) return void router.replace('/');
+    // allenamento appena avviato: schermata di partenza
+    splash.value = loaded.status === 'active' && Date.now() - (loaded.startedAt ?? 0) < 4000;
     await loadContext();
     if (loaded.status === 'active') void askNotificationPermission();
   },

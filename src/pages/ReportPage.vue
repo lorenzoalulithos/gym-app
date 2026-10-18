@@ -1,5 +1,5 @@
 <template>
-  <q-page class="page-pad">
+  <q-page class="page-pad stagger">
     <div class="row items-center q-mb-sm q-mt-sm">
       <q-btn flat round icon="arrow_back" aria-label="Indietro" @click="router.back()" />
       <div class="text-h5 text-weight-bold col">Report</div>
