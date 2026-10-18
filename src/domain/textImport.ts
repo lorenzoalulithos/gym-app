@@ -119,7 +119,7 @@ function parseSegment(text: string): {
   let sets: SetTarget[] = [];
   let specStart = -1;
   // 3x45s, 3x1', 3x1:30
-  const timed = s.match(/\s(\d+)\s*[x×]\s*(\d+(?::\d{2})?\s*(?:'|"|min|s|sec))(?=\s)/i);
+  const timed = s.match(/\s(\d+)\s*[x×]\s*(\d+:\d{2}|\d+\s*(?:'|"|min|s|sec))(?=\s)/i);
   // 4x8-10, 4x8
   const sr = s.match(/\s(\d+)\s*[x×]\s*(\d+)(?:\s*[-–]\s*(\d+))?(?=\s)/i);
   // piramide 12/10/8/6
@@ -328,6 +328,62 @@ const COMMON = new Set([
   'close-grip-barbell-bench-press',
 ]);
 
+/** Nomi italiani "da palestra" degli esercizi più comuni → esercizio della libreria. */
+const CLASSICS: Record<string, string> = {
+  'panca piana': 'barbell-bench-press-medium-grip',
+  'panca piana bilanciere': 'barbell-bench-press-medium-grip',
+  'panca piana manubri': 'dumbbell-bench-press',
+  'panca inclinata': 'barbell-incline-bench-press-medium-grip',
+  'panca inclinata bilanciere': 'barbell-incline-bench-press-medium-grip',
+  'panca inclinata manubri': 'incline-dumbbell-press',
+  'panca stretta': 'close-grip-barbell-bench-press',
+  squat: 'barbell-squat',
+  'squat bilanciere': 'barbell-squat',
+  stacco: 'barbell-deadlift',
+  'stacco terra': 'barbell-deadlift',
+  'stacco rumeno': 'romanian-deadlift',
+  'lat machine': 'wide-grip-lat-pulldown',
+  lat: 'wide-grip-lat-pulldown',
+  pulley: 'seated-cable-rows',
+  trazioni: 'pullups',
+  'trazioni prone': 'pullups',
+  'trazioni supine': 'chin-up',
+  military: 'standing-military-press',
+  'military press': 'standing-military-press',
+  'lento avanti': 'standing-military-press',
+  'shoulder press': 'dumbbell-shoulder-press',
+  'spinte manubri': 'dumbbell-shoulder-press',
+  'alzate laterali': 'side-lateral-raise',
+  'curl bilanciere': 'barbell-curl',
+  curl: 'barbell-curl',
+  'curl manubri': 'dumbbell-bicep-curl',
+  'curl martello': 'hammer-curls',
+  'hammer curl': 'hammer-curls',
+  'push down': 'triceps-pushdown',
+  pushdown: 'triceps-pushdown',
+  'french press': 'lying-triceps-press',
+  'leg press': 'leg-press',
+  'leg extension': 'leg-extensions',
+  'leg curl': 'lying-leg-curls',
+  polpacci: 'standing-calf-raises',
+  calf: 'standing-calf-raises',
+  dip: 'dips-triceps-version',
+  dips: 'dips-triceps-version',
+  'croci manubri': 'dumbbell-flyes',
+  'croci cavi': 'cable-crossover',
+  'croci panca inclinata': 'incline-dumbbell-flyes',
+  'rematore bilanciere': 'bent-over-barbell-row',
+  'rematore manubrio': 'one-arm-dumbbell-row',
+  affondi: 'dumbbell-lunges',
+  'hip thrust': 'barbell-hip-thrust',
+  'face pull': 'face-pull',
+  plank: 'plank',
+  crunch: 'crunches',
+  piegamenti: 'pushups',
+  'push up': 'pushups',
+  scrollate: 'barbell-shrug',
+};
+
 export const normalizeName = (s: string) =>
   s
     .toLowerCase()
@@ -390,6 +446,15 @@ export function matchExercise(
   const n = normalizeName(name);
   if (!n) return { candidates: [] };
   const exact = index.find((e) => e.exact.has(n));
+  const phrase =
+    CLASSICS[
+      n
+        .replace(/\b(?:con|col|al|ai|alla|il|la|da)\b/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+    ];
+  if (!exact && phrase && index.some((e) => e.ex.id === phrase))
+    return { id: phrase, candidates: [phrase] };
   if (exact) return { id: exact.ex.id, candidates: [exact.ex.id] };
 
   const q = new Set(tokens(translate(name)));
@@ -407,7 +472,7 @@ export function matchExercise(
           common / (q.size + e.tokens.size - common || 1),
           it.length ? itCommon / it.length : 0,
         ) +
-        Math.min(usage.get(e.ex.id) ?? 0, 10) * 0.01 +
+        Math.min(usage.get(e.ex.id) ?? 0, 5) * 0.01 +
         (e.ex.source === 'custom' ? 0.02 : 0) +
         (COMMON.has(e.ex.id) ? 0.1 : 0);
       return { id: e.ex.id, score };

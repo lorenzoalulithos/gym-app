@@ -213,7 +213,9 @@ function choose(it: ParsedExercise) {
 }
 
 function confirm() {
-  onDialogOK(props.mode === 'program' ? parsed.value : parsed.value![0]!.blocks);
+  // copia semplice: i proxy reattivi di Vue non si possono salvare in IndexedDB
+  const out = JSON.parse(JSON.stringify(parsed.value)) as ParsedDay[];
+  onDialogOK(props.mode === 'program' ? out : out[0]!.blocks);
 }
 </script>
 

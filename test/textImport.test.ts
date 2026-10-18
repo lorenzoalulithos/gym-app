@@ -137,3 +137,25 @@ describe('modifica rapida delle serie', () => {
     expect(isUniform(day.blocks[0]!.items[0]!.sets)).toBe(true);
   });
 });
+
+describe('nomi classici e righe difficili', () => {
+  it.each([
+    ['Panca piana', 'barbell-bench-press-medium-grip'],
+    ['Panca piana con manubri', 'dumbbell-bench-press'],
+    ['Squat', 'barbell-squat'],
+    ['Lat machine', 'wide-grip-lat-pulldown'],
+    ['Stacco rumeno', 'romanian-deadlift'],
+    ['Croci ai cavi', 'cable-crossover'],
+    ['Curl con bilanciere', 'barbell-curl'],
+  ])('%s → %s', (name, id) => expect(matchExercise(name, index).id).toBe(id));
+
+  it('tempo con i due punti, virgola decimale, solo nome', () => {
+    const b = parseBlocks('Plank 3x1:00\nRematore 4x10 @22,5 r1:30\nCrunch');
+    expect(b[0]!.items[0]).toMatchObject({ raw: 'Plank' });
+    expect(b[0]!.items[0]!.sets[0]).toEqual({ durationSec: 60 });
+    expect(b[1]!.items[0]!.sets[0]).toEqual({ reps: 10, weightKg: 22.5 });
+    expect(b[1]!.restSec).toBe(90);
+    expect(b[2]!.items[0]).toMatchObject({ raw: 'Crunch' });
+    expect(b[2]!.items[0]!.sets).toHaveLength(3);
+  });
+});

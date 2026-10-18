@@ -11,6 +11,7 @@ register(import.meta.env.QUASAR_SERVICE_WORKER_FILE, {
     });
   },
   error(err) {
-    console.error('Errore service worker:', err);
+    // senza rete il controllo degli aggiornamenti fallisce: è normale, l'app va offline
+    if (navigator.onLine) console.error('Errore service worker:', err);
   },
 });

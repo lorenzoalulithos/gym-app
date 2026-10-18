@@ -51,13 +51,17 @@
         </div>
       </div>
 
-      <q-item v-if="query?.trim()" clickable class="q-py-sm create-row" @click="create">
+      <q-item clickable class="q-py-sm create-row" @click="create">
         <q-item-section avatar
           ><q-icon name="add_circle" color="primary" size="32px"
         /></q-item-section>
         <q-item-section>
-          <q-item-label class="text-weight-bold">Crea «{{ query.trim() }}»</q-item-label>
-          <q-item-label caption>Un esercizio tuo, che non è nella lista</q-item-label>
+          <q-item-label class="text-weight-bold">
+            {{ query?.trim() ? `Crea «${query.trim()}»` : 'Crea un esercizio nuovo' }}
+          </q-item-label>
+          <q-item-label caption
+            >Un esercizio tuo, che non è nella lista (anche con foto)</q-item-label
+          >
         </q-item-section>
       </q-item>
 
@@ -153,7 +157,7 @@ function pick(id: string) {
 function create() {
   $q.dialog({
     component: ExerciseFormDialog,
-    componentProps: { name: query.value.trim(), muscle: muscle.value || undefined },
+    componentProps: { name: (query.value ?? '').trim(), muscle: muscle.value || undefined },
   }).onOk((id: string) => {
     if (props.multiple) {
       selected.value.push(id);

@@ -98,6 +98,15 @@
             @click="paste"
           />
         </div>
+        <q-btn
+          flat
+          no-caps
+          icon="add_circle_outline"
+          label="Crea un esercizio tuo (non in lista)"
+          color="primary"
+          class="full-width q-mt-sm"
+          @click="createCustom"
+        />
       </div>
     </template>
   </div>
@@ -106,6 +115,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { useQuasar } from 'quasar';
+import ExerciseFormDialog from '../ExerciseFormDialog.vue';
 import ExercisePicker from '../ExercisePicker.vue';
 import TextImportDialog from '../TextImportDialog.vue';
 import ItemRow from './ItemRow.vue';
@@ -146,6 +156,13 @@ function addExercises() {
   }).onOk((ids: string[]) => {
     for (const id of ids)
       day.value!.blocks.push(newBlock(id, exercises.get(id), settings.defaultRestSec));
+  });
+}
+
+/** Esercizio personalizzato creato al volo e aggiunto subito al giorno. */
+function createCustom() {
+  $q.dialog({ component: ExerciseFormDialog }).onOk((id: string) => {
+    day.value!.blocks.push(newBlock(id, exercises.get(id), settings.defaultRestSec));
   });
 }
 
