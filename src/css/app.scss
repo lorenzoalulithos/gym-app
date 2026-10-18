@@ -1,0 +1,39 @@
+// Stili globali
+
+body {
+  background: $dark-page;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: contain;
+}
+
+// I bottoni "primary" hanno testo scuro: il lime non regge il testo bianco.
+.bg-primary {
+  color: #0b0c0f;
+}
+
+.text-muted {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.card {
+  background: $dark;
+  border-radius: 16px;
+}
+
+.section-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.page-pad {
+  padding: 16px 16px 96px;
+  max-width: 720px;
+  margin: 0 auto;
+}

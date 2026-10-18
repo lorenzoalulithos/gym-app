@@ -1,0 +1,7 @@
+{
+  "extends": "../../.quasar/tsconfig.pwa-sw.json",
+  "compilerOptions": {
+    // i tipi dei plugin di Workbox non sono compatibili con exactOptionalPropertyTypes
+    "exactOptionalPropertyTypes": false
+  }
+}
