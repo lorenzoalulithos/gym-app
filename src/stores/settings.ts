@@ -7,6 +7,8 @@ const defaults = {
   sound: true,
   vibration: true,
   keepAwake: true,
+  /** Allenamento un esercizio alla volta, a tutto schermo. */
+  focusMode: true,
   /** Recupero proposto per esercizi aggiunti al volo. */
   defaultRestSec: 90,
   /** Conto alla rovescia prima delle serie a tempo. */

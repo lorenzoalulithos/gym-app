@@ -12,6 +12,7 @@ import {
   suggestIncrease,
 } from '@/domain/session';
 import { compareWithLast } from '@/domain/compare';
+import { firstUndone, setOrder } from '@/domain/focus';
 import { exerciseTrends } from '@/domain/analysis';
 
 const ex = (over: Partial<Exercise> = {}): Exercise => ({
@@ -237,5 +238,33 @@ describe("confronto con l'ultima volta", () => {
     expect(r.map((p) => p.exerciseId)).toEqual(['y', 'x']);
     expect(r[0]!.deltaPct).toBeCloseTo(20, 0);
     expect(r[1]!.deltaPct).toBe(0);
+  });
+});
+
+describe('modalità focus', () => {
+  it('ordine delle serie: superset a giri, singoli in fila', () => {
+    const s: Session = {
+      ...session('2026-10-20', []),
+      blocks: [
+        {
+          id: 'b1',
+          type: 'superset',
+          restSec: 90,
+          items: [
+            { id: 'a', exerciseId: 'x', sets: [{ done: true }, { done: false }] },
+            { id: 'b', exerciseId: 'y', sets: [{ done: true }, { done: false }, { done: false }] },
+          ],
+        },
+        {
+          id: 'b2',
+          type: 'single',
+          restSec: 60,
+          items: [{ id: 'c', exerciseId: 'z', sets: [{ done: false }] }],
+        },
+      ],
+    };
+    const order = setOrder(s).map((p) => `${p.bi}${p.ii}${p.si}`);
+    expect(order).toEqual(['000', '010', '001', '011', '012', '100']);
+    expect(firstUndone(s)).toBe(2);
   });
 });

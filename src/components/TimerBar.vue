@@ -7,7 +7,8 @@
         <div class="text-weight-bold">{{ formatClock(elapsed) }}</div>
       </div>
 
-      <template v-if="timer.rest">
+      <div v-if="hideRest" class="col" />
+      <template v-else-if="timer.rest">
         <q-btn
           flat
           round
@@ -74,7 +75,11 @@ import { useSettingsStore } from '@/stores/settings';
 import { useTimerStore } from '@/stores/timer';
 import { unlockAudio } from '@/services/feedback';
 
-const props = defineProps<{ startedAt: number | undefined }>();
+const props = defineProps<{
+  startedAt: number | undefined;
+  /** In modalità focus il recupero è già mostrato in grande nella pagina. */
+  hideRest?: boolean;
+}>();
 const emit = defineEmits<{ finish: [] }>();
 
 const $q = useQuasar();

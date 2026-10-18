@@ -1,4 +1,5 @@
 import type { Exercise, Session } from '@/db/types';
+import { formatSet } from './format';
 import { setMetrics } from './records';
 
 export interface ExerciseTrend {
@@ -25,13 +26,7 @@ export function sessionValue(s: Session, ex: Exercise): { value: number; topSet:
         const m = setMetrics(set, ex);
         const value =
           m.e1rm || (ex.measure === 'reps' ? m.reps + m.weight / 100 : 0) || m.duration || m.weight;
-        const topSet = [
-          set.weightKg ? `${set.weightKg}kg` : '',
-          set.reps !== undefined ? `${set.reps}r` : '',
-          set.durationSec ? `${set.durationSec}s` : '',
-        ]
-          .filter(Boolean)
-          .join('x');
+        const topSet = formatSet(set, ex);
         if (!best || value > best.value) best = { value: Math.round(value * 10) / 10, topSet };
       }
     }

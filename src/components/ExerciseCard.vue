@@ -174,8 +174,9 @@ const suggestion = computed(() =>
 function toggle(si: number) {
   unlockAudio();
   const set = props.item.sets[si]!;
-  if (set.done) workout.uncompleteSet(props.bi, props.ii, si);
-  else workout.completeSet(props.bi, props.ii, si);
+  if (set.done) return workout.uncompleteSet(props.bi, props.ii, si);
+  if (settings.vibration && 'vibrate' in navigator) navigator.vibrate(30);
+  workout.completeSet(props.bi, props.ii, si);
 }
 
 function startTimer(si: number) {

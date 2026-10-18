@@ -8,6 +8,14 @@
           <div v-if="s" class="text-caption text-muted">{{ formatDate(s.date) }}</div>
         </q-toolbar-title>
         <q-btn
+          v-if="mode === 'live'"
+          flat
+          round
+          :icon="settings.focusMode ? 'view_agenda' : 'center_focus_strong'"
+          :aria-label="settings.focusMode ? 'Vista elenco' : 'Modalità focus'"
+          @click="settings.focusMode = !settings.focusMode"
+        />
+        <q-btn
           v-if="mode === 'view'"
           flat
           round
@@ -44,138 +52,156 @@
 
     <q-page-container>
       <q-page v-if="s" class="page-pad">
-        <!-- Riepilogo della sessione conclusa -->
-        <div v-if="mode !== 'live'" class="card q-pa-md q-mb-md">
-          <div class="row text-center">
-            <div class="col">
-              <div class="stat tabular">{{ stats.minutes ?? '–' }}</div>
-              <div class="text-caption text-muted">minuti</div>
-            </div>
-            <div class="col">
-              <div class="stat tabular">{{ stats.sets }}</div>
-              <div class="text-caption text-muted">serie</div>
-            </div>
-            <div class="col">
-              <div class="stat tabular">{{ Math.round(stats.volume).toLocaleString('it-IT') }}</div>
-              <div class="text-caption text-muted">kg volume</div>
-            </div>
-            <div class="col">
-              <div class="stat tabular text-warning">{{ records?.count ?? 0 }}</div>
-              <div class="text-caption text-muted">record</div>
-            </div>
-          </div>
-          <div v-if="s.difficulty || s.notes" class="q-mt-sm text-center text-muted">
-            <span v-if="s.difficulty">Difficoltà: {{ DIFFICULTY[s.difficulty] }}</span>
-            <span v-if="s.notes"> · {{ s.notes }}</span>
-          </div>
-        </div>
-
-        <!-- Dove hai spinto di più rispetto all'ultima volta -->
-        <div v-if="mode === 'view' && progress.length" class="card q-pa-md q-mb-md">
-          <div class="text-weight-bold q-mb-xs">Rispetto all'ultima volta</div>
-          <div class="text-caption text-muted q-mb-sm">
-            Serie migliore di ogni esercizio: massimale stimato, ripetizioni o tempo
-          </div>
-          <div v-for="p in progress" :key="p.exerciseId" class="prog-row row items-center no-wrap">
-            <div class="col" style="min-width: 0">
-              <div class="ellipsis text-weight-medium">{{ p.name }}</div>
-              <div class="text-caption text-muted tabular">
-                <template v-if="p.before !== null">
-                  {{ fmtMetric(p.metric, p.before) }} → {{ fmtMetric(p.metric, p.now) }}
-                </template>
-                <template v-else>prima volta · {{ fmtMetric(p.metric, p.now) }}</template>
+        <FocusView
+          v-if="mode === 'live' && settings.focusMode"
+          :last-by-exercise="lastByExercise"
+          @finish="finish"
+          @add="addExercise()"
+        />
+        <template v-else>
+          <!-- Riepilogo della sessione conclusa -->
+          <div v-if="mode !== 'live'" class="card q-pa-md q-mb-md">
+            <div class="row text-center">
+              <div class="col">
+                <div class="stat tabular">{{ stats.minutes ?? '–' }}</div>
+                <div class="text-caption text-muted">minuti</div>
+              </div>
+              <div class="col">
+                <div class="stat tabular">{{ stats.sets }}</div>
+                <div class="text-caption text-muted">serie</div>
+              </div>
+              <div class="col">
+                <div class="stat tabular">
+                  {{ Math.round(stats.volume).toLocaleString('it-IT') }}
+                </div>
+                <div class="text-caption text-muted">kg volume</div>
+              </div>
+              <div class="col">
+                <div class="stat tabular text-warning">{{ records?.count ?? 0 }}</div>
+                <div class="text-caption text-muted">record</div>
               </div>
             </div>
-            <div class="delta tabular" :class="deltaClass(p.deltaPct)">
-              <template v-if="p.deltaPct === null">nuovo</template>
-              <template v-else>{{ p.deltaPct > 0 ? '+' : '' }}{{ p.deltaPct }}%</template>
+            <div v-if="s.difficulty || s.notes" class="q-mt-sm text-center text-muted">
+              <span v-if="s.difficulty">Difficoltà: {{ DIFFICULTY[s.difficulty] }}</span>
+              <span v-if="s.notes"> · {{ s.notes }}</span>
             </div>
           </div>
-        </div>
 
-        <div v-for="(block, bi) in s.blocks" :key="block.id" class="card block q-mb-md">
-          <div class="row items-center q-mb-xs">
-            <div class="section-label col">
-              {{
-                block.type === 'superset' ? 'Superset' : block.type === 'circuit' ? 'Circuito' : ''
-              }}
+          <!-- Dove hai spinto di più rispetto all'ultima volta -->
+          <div v-if="mode === 'view' && progress.length" class="card q-pa-md q-mb-md">
+            <div class="text-weight-bold q-mb-xs">Rispetto all'ultima volta</div>
+            <div class="text-caption text-muted q-mb-sm">
+              Serie migliore di ogni esercizio: massimale stimato, ripetizioni o tempo
             </div>
-            <q-chip
-              v-if="mode !== 'view' && block.type !== 'single'"
-              dense
-              outline
-              clickable
-              icon="timer"
-              color="grey-6"
-              :label="`${formatClock(block.restSec)} dopo il giro`"
-              @click="editRest(bi)"
-            />
-            <q-btn
-              v-if="mode !== 'view'"
-              flat
-              round
-              dense
-              size="sm"
-              icon="more_horiz"
-              color="grey-6"
+            <div
+              v-for="p in progress"
+              :key="p.exerciseId"
+              class="prog-row row items-center no-wrap"
             >
-              <q-menu auto-close>
-                <q-list style="min-width: 200px">
-                  <q-item clickable @click="addExercise(bi)">
-                    <q-item-section avatar><q-icon name="link" /></q-item-section>
-                    <q-item-section>Aggiungi in superset</q-item-section>
-                  </q-item>
-                  <q-item v-if="block.type !== 'single'" clickable @click="editRest(bi)">
-                    <q-item-section avatar><q-icon name="timer" /></q-item-section>
-                    <q-item-section>Recupero dopo il giro</q-item-section>
-                  </q-item>
-                  <q-item clickable :disable="bi === 0" @click="workout.moveBlock(bi, -1)">
-                    <q-item-section avatar><q-icon name="arrow_upward" /></q-item-section>
-                    <q-item-section>Sposta su</q-item-section>
-                  </q-item>
-                  <q-item
-                    clickable
-                    :disable="bi === s.blocks.length - 1"
-                    @click="workout.moveBlock(bi, 1)"
-                  >
-                    <q-item-section avatar><q-icon name="arrow_downward" /></q-item-section>
-                    <q-item-section>Sposta giù</q-item-section>
-                  </q-item>
-                </q-list>
-              </q-menu>
-            </q-btn>
+              <div class="col" style="min-width: 0">
+                <div class="ellipsis text-weight-medium">{{ p.name }}</div>
+                <div class="text-caption text-muted tabular">
+                  <template v-if="p.before !== null">
+                    {{ fmtMetric(p.metric, p.before) }} → {{ fmtMetric(p.metric, p.now) }}
+                  </template>
+                  <template v-else>prima volta · {{ fmtMetric(p.metric, p.now) }}</template>
+                </div>
+              </div>
+              <div class="delta tabular" :class="deltaClass(p.deltaPct)">
+                <template v-if="p.deltaPct === null">nuovo</template>
+                <template v-else>{{ p.deltaPct > 0 ? '+' : '' }}{{ p.deltaPct }}%</template>
+              </div>
+            </div>
           </div>
-          <div :class="{ superset: block.items.length > 1 }">
-            <ExerciseCard
-              v-for="(it, ii) in block.items"
-              :key="it.id"
-              :item="it"
-              :bi="bi"
-              :ii="ii"
-              :mode="mode"
-              :last="lastByExercise.get(it.exerciseId)"
-              :records="records"
-              :class="{ 'q-mt-lg': ii > 0 }"
-            />
-          </div>
-        </div>
 
-        <q-btn
-          v-if="mode !== 'view'"
-          outline
-          no-caps
-          icon="add"
-          label="Aggiungi esercizio"
-          color="grey-5"
-          class="full-width q-py-sm"
-          style="border-radius: 14px"
-          @click="addExercise()"
-        />
+          <div v-for="(block, bi) in s.blocks" :key="block.id" class="card block q-mb-md">
+            <div class="row items-center q-mb-xs">
+              <div class="section-label col">
+                {{
+                  block.type === 'superset'
+                    ? 'Superset'
+                    : block.type === 'circuit'
+                      ? 'Circuito'
+                      : ''
+                }}
+              </div>
+              <q-chip
+                v-if="mode !== 'view' && block.type !== 'single'"
+                dense
+                outline
+                clickable
+                icon="timer"
+                color="grey-6"
+                :label="`${formatClock(block.restSec)} dopo il giro`"
+                @click="editRest(bi)"
+              />
+              <q-btn
+                v-if="mode !== 'view'"
+                flat
+                round
+                dense
+                size="sm"
+                icon="more_horiz"
+                color="grey-6"
+              >
+                <q-menu auto-close>
+                  <q-list style="min-width: 200px">
+                    <q-item clickable @click="addExercise(bi)">
+                      <q-item-section avatar><q-icon name="link" /></q-item-section>
+                      <q-item-section>Aggiungi in superset</q-item-section>
+                    </q-item>
+                    <q-item v-if="block.type !== 'single'" clickable @click="editRest(bi)">
+                      <q-item-section avatar><q-icon name="timer" /></q-item-section>
+                      <q-item-section>Recupero dopo il giro</q-item-section>
+                    </q-item>
+                    <q-item clickable :disable="bi === 0" @click="workout.moveBlock(bi, -1)">
+                      <q-item-section avatar><q-icon name="arrow_upward" /></q-item-section>
+                      <q-item-section>Sposta su</q-item-section>
+                    </q-item>
+                    <q-item
+                      clickable
+                      :disable="bi === s.blocks.length - 1"
+                      @click="workout.moveBlock(bi, 1)"
+                    >
+                      <q-item-section avatar><q-icon name="arrow_downward" /></q-item-section>
+                      <q-item-section>Sposta giù</q-item-section>
+                    </q-item>
+                  </q-list>
+                </q-menu>
+              </q-btn>
+            </div>
+            <div :class="{ superset: block.items.length > 1 }">
+              <ExerciseCard
+                v-for="(it, ii) in block.items"
+                :key="it.id"
+                :item="it"
+                :bi="bi"
+                :ii="ii"
+                :mode="mode"
+                :last="lastByExercise.get(it.exerciseId)"
+                :records="records"
+                :class="{ 'q-mt-lg': ii > 0 }"
+              />
+            </div>
+          </div>
+
+          <q-btn
+            v-if="mode !== 'view'"
+            outline
+            no-caps
+            icon="add"
+            label="Aggiungi esercizio"
+            color="grey-5"
+            class="full-width q-py-sm"
+            style="border-radius: 14px"
+            @click="addExercise()"
+          />
+        </template>
       </q-page>
     </q-page-container>
 
     <q-footer v-if="mode === 'live' && s">
-      <TimerBar :started-at="s.startedAt" @finish="finish" />
+      <TimerBar :started-at="s.startedAt" :hide-rest="settings.focusMode" @finish="finish" />
     </q-footer>
     <WorkOverlay @stop="onWorkStopped" />
   </q-layout>
@@ -188,6 +214,7 @@ import { useRouter } from 'vue-router';
 import ExerciseCard from '@/components/ExerciseCard.vue';
 import ExercisePicker from '@/components/ExercisePicker.vue';
 import FinishDialog from '@/components/FinishDialog.vue';
+import FocusView from '@/components/FocusView.vue';
 import TimerBar from '@/components/TimerBar.vue';
 import WorkOverlay from '@/components/WorkOverlay.vue';
 import { useRestPicker } from '@/composables/useRestPicker';
