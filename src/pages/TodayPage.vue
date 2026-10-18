@@ -57,7 +57,7 @@
         <q-btn flat dense no-caps color="grey-5" label="Lascia perdere" @click="skipWorkout(m)" />
         <q-btn outline dense no-caps label="Sposta" class="q-px-sm" @click="askMove(m)" />
         <q-btn
-          v-if="!todayCal.planned || todayCal.status === 'done'"
+          v-if="todayCal.status === 'rest' || todayCal.status === 'skipped'"
           unelevated
           dense
           no-caps
@@ -65,7 +65,7 @@
           text-color="dark"
           label="Fallo oggi"
           class="q-px-sm"
-          @click="moveWorkout(m, today)"
+          @click="moveWorkout(m, today, input)"
         />
       </div>
     </div>
@@ -193,11 +193,13 @@ import { moveWorkout, skipWorkout, useCalendar } from '@/composables/useCalendar
 import { useLiveQuery } from '@/composables/useLiveQuery';
 import { db } from '@/db';
 import type { Session } from '@/db/types';
-import { currentMonth, formatDate, formatMonth, summarizeTargets, todayIso } from '@/domain/format';
+import { formatDate, formatMonth, summarizeTargets } from '@/domain/format';
+import { useToday } from '@/composables/useToday';
 import {
   addDays,
   calendarDay,
   dayLetter,
+  isoWeekday,
   nextPlanned,
   recentMissed,
   type CalendarDay,
@@ -214,8 +216,7 @@ const exercises = useExercisesStore();
 const settings = useSettingsStore();
 const workout = useWorkoutStore();
 
-const today = todayIso();
-const month = currentMonth();
+const { today, month } = useToday();
 
 const hour = new Date().getHours();
 const greeting = hour < 12 ? 'Buongiorno 💪' : hour < 18 ? 'Si spinge? 🔥' : 'Ultimo sforzo 🌙';
@@ -227,19 +228,22 @@ const { data: sessions } = useLiveQuery(
 );
 const { data: programs } = useLiveQuery(() => db.programs.toArray(), [], []);
 const { data: photosThisMonthData } = useLiveQuery(
-  () => db.photos.where('month').equals(month).toArray(),
-  [],
+  () => db.photos.where('month').equals(month.value).toArray(),
+  [month],
   [],
 );
 
 const active = computed(() => sessions.value?.find((s) => s.status === 'active'));
 const done = computed(() => (sessions.value ?? []).filter((s) => s.status === 'done'));
-const program = computed(() => activeProgram(programs.value ?? [], today));
+const program = computed(() => activeProgram(programs.value ?? [], today.value));
 const chosenDayId = ref<string>();
 
-const todayCal = computed(() => calendarDay(today, input.value));
+const todayCal = computed(() => calendarDay(today.value, input.value));
 const upcoming = computed(() =>
-  nextPlanned(input.value, todayCal.value.status === 'done' ? addDays(today, 1) : today),
+  nextPlanned(
+    input.value,
+    todayCal.value.status === 'done' ? addDays(today.value, 1) : today.value,
+  ),
 );
 const missed = computed(() => recentMissed(input.value));
 
@@ -269,23 +273,25 @@ const heroLabel = computed(() => {
 function askMove(d: CalendarDay) {
   const busy: Record<string, string> = {};
   for (let i = 0; i < 60; i++) {
-    const c = calendarDay(addDays(today, i), input.value);
+    const c = calendarDay(addDays(today.value, i), input.value);
     if (c.planned && c.status !== 'done') busy[c.date] = c.planned.name;
   }
   $q.dialog({
     component: MoveDialog,
     componentProps: { from: d.date, dayName: d.planned?.name ?? '', busy },
-  }).onOk((to: string) => void moveWorkout(d, to));
+  }).onOk((to: string) => void moveWorkout(d, to, input.value));
 }
 const recent = computed(() => done.value.slice(0, 3));
 
 const photosThisMonth = computed(() => new Set(photosThisMonthData.value?.map((p) => p.pose)).size);
-const photoDue = computed(() => photosThisMonth.value < 3 && settings.photoSnoozedMonth !== month);
+const photoDue = computed(
+  () => photosThisMonth.value < 3 && settings.photoSnoozedMonth !== month.value,
+);
 
 const lastOf = (dayId: string) => done.value.find((s) => s.dayId === dayId);
 
 const week = computed(() => {
-  const monday = addDays(today, -((new Date().getDay() + 6) % 7));
+  const monday = addDays(today.value, -(isoWeekday(today.value) - 1));
   return ['L', 'M', 'M', 'G', 'V', 'S', 'D'].map((label, i) => {
     const c = calendarDay(addDays(monday, i), input.value);
     const tag =
@@ -309,7 +315,7 @@ const timeOf = (t?: number) =>
 
 function relative(iso: string) {
   const days = Math.round(
-    (new Date(`${today}T12:00`).getTime() - new Date(`${iso}T12:00`).getTime()) / 86400000,
+    (new Date(`${today.value}T12:00`).getTime() - new Date(`${iso}T12:00`).getTime()) / 86400000,
   );
   return days === 0 ? 'oggi' : days === 1 ? 'ieri' : `${days} giorni fa`;
 }
@@ -318,14 +324,17 @@ const open = (id: string) => void router.push({ name: 'workout', params: { id } 
 
 const starting = ref(false);
 async function start() {
-  if (!program.value || !next.value) return;
+  const p = program.value;
+  const day = next.value;
+  if (!p || !day) return;
   starting.value = true;
   try {
+    // allenarsi in un giorno di riposo "anticipa" il prossimo allenamento previsto
     const up = upcoming.value;
-    if (!chosenDayId.value && up && up.date !== today && up.planned?.id === next.value.id) {
-      await moveWorkout(up, today);
+    if (!chosenDayId.value && up && up.date !== today.value && up.planned?.id === day.id) {
+      await moveWorkout(up, today.value, input.value);
     }
-    open(await workout.startFromDay(program.value, next.value));
+    open(await workout.startFromDay(p, day));
   } finally {
     starting.value = false;
   }

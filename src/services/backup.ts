@@ -58,7 +58,7 @@ export async function collectData(withAnalysis = true): Promise<BackupData> {
     conventions: CONVENTIONS,
     exercises,
     programs,
-    sessions: sessions.filter((s) => s.status === 'done'),
+    sessions,
     bodyMetrics,
     schedule,
   };

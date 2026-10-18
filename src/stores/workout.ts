@@ -1,9 +1,10 @@
 import { defineStore } from 'pinia';
+import { Notify } from 'quasar';
 import { ref, watch } from 'vue';
 import { db } from '@/db';
 import type { LoggedSet, Program, ProgramDay, Session } from '@/db/types';
 import { todayIso } from '@/domain/format';
-import { buildItem, emptySession, sessionFromDay, touchSession } from '@/domain/session';
+import { buildItem, emptySession, restAfter, sessionFromDay, touchSession } from '@/domain/session';
 import { useExercisesStore } from './exercises';
 import { useSettingsStore } from './settings';
 import { useTimerStore } from './timer';
@@ -20,20 +21,64 @@ export const useWorkoutStore = defineStore('workout', () => {
   const session = ref<Session | null>(null);
   let saveTimer: ReturnType<typeof setTimeout> | undefined;
   let loading = false;
+  /** Ci sono modifiche non ancora scritte: solo allora flush() scrive. */
+  let dirty = false;
+  let starting: Promise<string> | null = null;
+
+  async function save() {
+    clearTimeout(saveTimer);
+    if (!dirty || !session.value) return;
+    dirty = false;
+    await db.sessions.put(touchSession(clone(session.value)));
+  }
 
   watch(
     session,
     (s) => {
       if (!s || loading) return;
+      dirty = true;
       clearTimeout(saveTimer);
-      saveTimer = setTimeout(() => void db.sessions.put(touchSession(clone(s))), 200);
+      saveTimer = setTimeout(() => void save(), 200);
     },
     { deep: true },
   );
 
-  async function flush() {
+  const flush = save;
+
+  /** Dimentica la sessione in memoria (es. dopo il ripristino di un backup). */
+  function reset() {
     clearTimeout(saveTimer);
-    if (session.value) await db.sessions.put(touchSession(clone(session.value)));
+    dirty = false;
+    session.value = null;
+    const timer = useTimerStore();
+    timer.stopRest();
+    timer.stopWork();
+  }
+
+  async function activeId() {
+    return (await db.sessions.where('status').equals('active').first())?.id;
+  }
+
+  /**
+   * Un solo allenamento in corso alla volta: se ce n'è già uno si riapre quello.
+   * Protegge anche dal doppio tap sul bottone.
+   */
+  function startOnce(create: () => Promise<Session>): Promise<string> {
+    starting ??= (async () => {
+      try {
+        const existing = await activeId();
+        if (existing) {
+          Notify.create({ message: 'Hai già un allenamento in corso: lo riapro', icon: 'info' });
+          return existing;
+        }
+        const s = await create();
+        await db.sessions.add(s);
+        return s.id;
+      } finally {
+        starting = null;
+      }
+    })();
+    return starting;
   }
 
   async function load(id: string) {
@@ -46,16 +91,22 @@ export const useWorkoutStore = defineStore('workout', () => {
     return session.value;
   }
 
-  async function startFromDay(program: Program, day: ProgramDay) {
-    const s = sessionFromDay(program, day, await doneHistory(), todayIso());
-    await db.sessions.add(s);
-    return s.id;
+  function startFromDay(program: Program, day: ProgramDay) {
+    return startOnce(async () => sessionFromDay(program, day, await doneHistory(), todayIso()));
   }
 
-  async function startEmpty() {
-    const s = emptySession(todayIso());
-    await db.sessions.add(s);
-    return s.id;
+  function startEmpty() {
+    return startOnce(() => Promise.resolve(emptySession(todayIso())));
+  }
+
+  /** Toglie serie non spuntate ed esercizi rimasti vuoti. */
+  function pruneUndone() {
+    const s = session.value;
+    if (!s) return;
+    for (const b of s.blocks) for (const i of b.items) i.sets = i.sets.filter((x) => x.done);
+    for (const b of s.blocks) b.items = b.items.filter((i) => i.sets.length > 0);
+    s.blocks = s.blocks.filter((b) => b.items.length > 0);
+    dirty = true;
   }
 
   const item = (bi: number, ii: number) => session.value!.blocks[bi]!.items[ii]!;
@@ -70,18 +121,24 @@ export const useWorkoutStore = defineStore('workout', () => {
     set.completedAt = Date.now();
     if (s.status !== 'active') return;
 
-    // In superset/circuito si recupera solo dopo l'ultimo esercizio del giro.
-    const isLastOfRound = block.type === 'single' || ii === block.items.length - 1;
-    if (!isLastOfRound) return;
-    const restSec = set.target?.restSec ?? block.restSec;
-    const nextLabel = nextSetLabel(bi, ii, si);
-    useTimerStore().startRest(restSec, nextLabel);
+    const restSec = restAfter(block, ii, set.target?.restSec);
+    if (restSec > 0) useTimerStore().startRest(restSec, nextSetLabel(bi, ii, si));
+  }
+
+  /** Recupero proprio di un esercizio; undefined = torna a quello del blocco. */
+  function setItemRest(bi: number, ii: number, sec: number | undefined) {
+    const it = item(bi, ii);
+    if (sec === undefined) delete it.restSec;
+    else it.restSec = sec;
   }
 
   function nextSetLabel(bi: number, ii: number, si: number) {
     const ex = useExercisesStore();
     const block = session.value!.blocks[bi]!;
     const firstItem = block.items[0]!;
+    const nextInRound = block.items[ii + 1];
+    if (block.type !== 'single' && nextInRound)
+      return `Prossimo: ${ex.nameOf(nextInRound.exerciseId)}`;
     if (block.type !== 'single' && firstItem.sets.length > si + 1)
       return `Prossimo: ${ex.nameOf(firstItem.exerciseId)}`;
     if (block.type === 'single' && item(bi, ii).sets.length > si + 1)
@@ -156,9 +213,7 @@ export const useWorkoutStore = defineStore('workout', () => {
     s.endedAt = Date.now();
     if (data.difficulty) s.difficulty = data.difficulty;
     if (data.notes) s.notes = data.notes;
-    for (const b of s.blocks) for (const i of b.items) i.sets = i.sets.filter((x) => x.done);
-    for (const b of s.blocks) b.items = b.items.filter((i) => i.sets.length > 0);
-    s.blocks = s.blocks.filter((b) => b.items.length > 0);
+    pruneUndone();
     const timer = useTimerStore();
     timer.stopRest();
     timer.stopWork();
@@ -169,6 +224,7 @@ export const useWorkoutStore = defineStore('workout', () => {
     const s = session.value;
     if (!s) return;
     clearTimeout(saveTimer);
+    dirty = false;
     session.value = null;
     useTimerStore().stopRest();
     await db.sessions.delete(s.id);
@@ -178,12 +234,16 @@ export const useWorkoutStore = defineStore('workout', () => {
     session,
     load,
     flush,
+    reset,
+    activeId,
+    pruneUndone,
     startFromDay,
     startEmpty,
     completeSet,
     uncompleteSet,
     addSet,
     duplicateSet,
+    setItemRest,
     removeSet,
     addExercise,
     removeItem,

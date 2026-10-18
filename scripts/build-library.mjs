@@ -39,7 +39,10 @@ async function convertImage(srcPath, outPath) {
   if (!res.ok) throw new Error(`${res.status} ${srcPath}`);
   const buf = Buffer.from(await res.arrayBuffer());
   await mkdir(dirname(outPath), { recursive: true });
-  await sharp(buf).resize({ width: 480, withoutEnlargement: true }).webp({ quality: 70 }).toFile(outPath);
+  await sharp(buf)
+    .resize({ width: 480, withoutEnlargement: true })
+    .webp({ quality: 70 })
+    .toFile(outPath);
 }
 
 async function pool(items, size, fn) {
@@ -83,7 +86,10 @@ console.log(`library.json: ${library.length} esercizi su ${all.length}`);
 
 if (!SKIP_IMAGES) {
   const jobs = kept.flatMap((e) =>
-    e.images.map((img, i) => ({ img, out: join(ROOT, 'public/exercises', slug(e.id), `${i}.webp`) })),
+    e.images.map((img, i) => ({
+      img,
+      out: join(ROOT, 'public/exercises', slug(e.id), `${i}.webp`),
+    })),
   );
   console.log(`immagini: ${jobs.length}`);
   await pool(jobs, 16, (j) => convertImage(j.img, j.out));

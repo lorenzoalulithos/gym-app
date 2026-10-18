@@ -100,20 +100,47 @@ export function nextPlanned(
   return undefined;
 }
 
+export interface ScheduleChanges {
+  put: ScheduleOverride[];
+  del: string[];
+}
+
 /**
- * Spostamento di un allenamento: la data di origine diventa riposo,
- * quella di destinazione riceve il giorno della scheda.
+ * Spostamento di un allenamento a un'altra data.
+ * Gli spostamenti non fanno catene: si riparte sempre dalla data originale, così
+ * "Ripristina" su qualunque estremo rimette tutto com'era.
  */
 export function moveOverrides(
   from: CalendarDay,
   to: string,
-): [ScheduleOverride, ScheduleOverride] | null {
+  input: CalendarInput,
+): ScheduleChanges | null {
   if (!from.planned || !from.program || to === from.date) return null;
   const programId = from.program.id;
-  return [
-    { date: from.date, programId, dayId: null, movedTo: to },
-    { date: to, programId, dayId: from.planned.id, movedFrom: from.date },
-  ];
+  const dayId = from.planned.id;
+  const origin = from.override?.movedFrom ?? from.date;
+  const changes: ScheduleChanges = { put: [], del: [] };
+
+  // la data intermedia di uno spostamento precedente torna allo schema settimanale
+  if (from.override?.movedFrom) changes.del.push(from.date);
+
+  // se la destinazione ospitava già un allenamento spostato, la sua origine resta vuota
+  const target = input.overrides.get(to);
+  if (target?.movedFrom && target.movedFrom !== origin) {
+    changes.put.push({ date: target.movedFrom, programId: target.programId, dayId: null });
+  }
+
+  if (to === origin) {
+    // riportato al suo giorno: basta togliere le eccezioni
+    changes.del.push(origin);
+    if (!changes.del.includes(to)) changes.del.push(to);
+    return changes;
+  }
+  changes.put.push(
+    { date: origin, programId, dayId: null, movedTo: to },
+    { date: to, programId, dayId, movedFrom: origin },
+  );
+  return changes;
 }
 
 export function groupByDate(sessions: Session[]): Map<string, Session[]> {

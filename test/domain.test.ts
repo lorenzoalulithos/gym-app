@@ -7,9 +7,11 @@ import {
   lastPerformance,
   nextDay,
   prefillSet,
+  restAfter,
   sessionFromDay,
   suggestIncrease,
 } from '@/domain/session';
+import { compareWithLast } from '@/domain/compare';
 import { exerciseTrends } from '@/domain/analysis';
 
 const ex = (over: Partial<Exercise> = {}): Exercise => ({
@@ -173,5 +175,67 @@ describe('sessione', () => {
     );
     expect(t[0]!.trend).toBe('progress');
     expect(t[0]!.series).toHaveLength(2);
+  });
+});
+
+describe('recupero per esercizio', () => {
+  const block = (type: 'single' | 'superset', items: { restSec?: number }[]) => ({
+    type,
+    restSec: 90,
+    items,
+  });
+  it('singolo: vale il blocco, salvo recupero proprio', () => {
+    expect(restAfter(block('single', [{}]), 0)).toBe(90);
+    expect(restAfter(block('single', [{ restSec: 45 }]), 0)).toBe(45);
+  });
+  it('superset: nessun recupero tra gli esercizi, quello del blocco a fine giro', () => {
+    const b = block('superset', [{}, {}]);
+    expect(restAfter(b, 0)).toBe(0);
+    expect(restAfter(b, 1)).toBe(90);
+    expect(restAfter(block('superset', [{ restSec: 20 }, {}]), 0)).toBe(20);
+  });
+  it('il recupero della serie vince su tutto', () => {
+    expect(restAfter(block('single', [{ restSec: 45 }]), 0, 150)).toBe(150);
+  });
+});
+
+describe("confronto con l'ultima volta", () => {
+  it('ordina da dove hai spinto di più', () => {
+    const a = ex({ id: 'x' });
+    const b = ex({ id: 'y', name: 'Y' });
+    const mk = (date: string, xw: number, yw: number): Session => ({
+      ...session(date, []),
+      id: date,
+      blocks: [
+        {
+          id: 'b1',
+          type: 'single',
+          restSec: 60,
+          items: [
+            { id: `x${date}`, exerciseId: 'x', sets: [{ weightKg: xw, reps: 8, done: true }] },
+          ],
+        },
+        {
+          id: 'b2',
+          type: 'single',
+          restSec: 60,
+          items: [
+            { id: `y${date}`, exerciseId: 'y', sets: [{ weightKg: yw, reps: 8, done: true }] },
+          ],
+        },
+      ],
+      exerciseIds: ['x', 'y'],
+    });
+    const r = compareWithLast(
+      mk('2026-10-20', 20, 30),
+      [mk('2026-10-13', 20, 25)],
+      new Map([
+        ['x', a],
+        ['y', b],
+      ]),
+    );
+    expect(r.map((p) => p.exerciseId)).toEqual(['y', 'x']);
+    expect(r[0]!.deltaPct).toBeCloseTo(20, 0);
+    expect(r[1]!.deltaPct).toBe(0);
   });
 });

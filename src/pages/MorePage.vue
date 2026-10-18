@@ -143,9 +143,11 @@ import {
   type ReminderStatus,
 } from '@/services/reminders';
 import { useSettingsStore } from '@/stores/settings';
+import { useWorkoutStore } from '@/stores/workout';
 
 const $q = useQuasar();
 const settings = useSettingsStore();
+const workout = useWorkoutStore();
 const busy = ref(false);
 const fileInput = ref<HTMLInputElement>();
 const persisted = ref<boolean | null>(null);
@@ -203,6 +205,7 @@ async function onImport(e: Event) {
       () =>
         void run(async () => {
           await applyBackup(data, photos);
+          workout.reset();
           $q.notify({
             message: 'Backup ripristinato',
             color: 'positive',

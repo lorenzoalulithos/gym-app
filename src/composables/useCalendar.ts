@@ -7,11 +7,12 @@ import {
   type CalendarDay,
   type CalendarInput,
 } from '@/domain/calendar';
-import { todayIso } from '@/domain/format';
+import { useToday } from './useToday';
 import { useLiveQuery } from './useLiveQuery';
 
 /** Dati del calendario sempre aggiornati, più le azioni per spostare/saltare allenamenti. */
 export function useCalendar() {
+  const { today } = useToday();
   const { data: programs } = useLiveQuery(() => db.programs.toArray(), [], []);
   const { data: overrides } = useLiveQuery(() => db.schedule.toArray(), [], []);
   const { data: sessions } = useLiveQuery(() => db.sessions.toArray(), [], []);
@@ -26,7 +27,7 @@ export function useCalendar() {
       programs: programs.value ?? [],
       overrides: new Map((overrides.value ?? []).map((o) => [o.date, o])),
       sessionsByDate: groupByDate(sessions.value ?? []),
-      today: todayIso(),
+      today: today.value,
     };
     if (since) out.since = since;
     return out;
@@ -35,10 +36,13 @@ export function useCalendar() {
   return { input, sessions, programs };
 }
 
-export async function moveWorkout(day: CalendarDay, to: string) {
-  const pair = moveOverrides(day, to);
-  if (!pair) return;
-  await db.schedule.bulkPut(pair);
+export async function moveWorkout(day: CalendarDay, to: string, input: CalendarInput) {
+  const changes = moveOverrides(day, to, input);
+  if (!changes) return;
+  await db.transaction('rw', db.schedule, async () => {
+    await db.schedule.bulkDelete(changes.del);
+    await db.schedule.bulkPut(changes.put);
+  });
 }
 
 export async function skipWorkout(day: CalendarDay) {

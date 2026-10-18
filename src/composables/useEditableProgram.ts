@@ -1,4 +1,4 @@
-import { ref, watch, type Ref } from 'vue';
+import { onBeforeUnmount, ref, watch, type Ref } from 'vue';
 import { db } from '@/db';
 import type { Program } from '@/db/types';
 
@@ -7,6 +7,18 @@ export function useEditableProgram(id: Ref<string>) {
   const program = ref<Program | null>(null);
   let timer: ReturnType<typeof setTimeout> | undefined;
   let skipNext = false;
+  let pending = false;
+
+  function save() {
+    clearTimeout(timer);
+    const p = program.value;
+    if (!pending || !p) return;
+    pending = false;
+    // updatedAt solo sulla copia: modificarlo qui riattiverebbe il watcher all'infinito
+    const copy = JSON.parse(JSON.stringify(p)) as Program;
+    copy.updatedAt = Date.now();
+    void db.programs.put(copy);
+  }
 
   watch(
     id,
@@ -25,14 +37,16 @@ export function useEditableProgram(id: Ref<string>) {
         skipNext = false;
         return;
       }
+      pending = true;
       clearTimeout(timer);
-      timer = setTimeout(() => {
-        p.updatedAt = Date.now();
-        void db.programs.put(JSON.parse(JSON.stringify(p)) as Program);
-      }, 300);
+      timer = setTimeout(save, 300);
     },
     { deep: true },
   );
+
+  // Uscendo dalla pagina si scrive subito: la pagina successiva legge la scheda aggiornata
+  // (le transazioni IndexedDB vengono eseguite nell'ordine in cui partono).
+  onBeforeUnmount(save);
 
   return program;
 }

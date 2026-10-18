@@ -22,7 +22,7 @@
           d.status,
           { out: !d.date.startsWith(month), sel: d.date === selected, now: d.date === today },
         ]"
-        @click="selected = d.date"
+        @click="openDay(d.date)"
       >
         <span class="num">{{ Number(d.date.slice(8)) }}</span>
         <span class="tag">{{ tagOf(d) }}</span>
@@ -33,89 +33,6 @@
       <span><i class="planned" />previsto</span>
       <span><i class="missed" />saltato</span>
       <span><i class="skipped" />annullato</span>
-    </div>
-
-    <!-- Giorno selezionato -->
-    <div v-if="sel" class="card q-pa-md q-mb-lg">
-      <div class="text-caption text-muted text-uppercase">{{ formatDate(sel.date) }}</div>
-      <template v-if="sel.sessions.length">
-        <div
-          v-for="s in sel.sessions"
-          :key="s.id"
-          class="row items-center q-mt-xs"
-          @click="open(s.id)"
-        >
-          <q-icon name="check_circle" color="primary" size="22px" class="q-mr-sm" />
-          <div class="col text-weight-bold">{{ s.title }}</div>
-          <q-icon name="chevron_right" />
-        </div>
-      </template>
-      <template v-else-if="sel.planned">
-        <div class="text-h6 q-mt-xs">{{ sel.planned.name }}</div>
-        <div class="text-caption" :class="sel.status === 'missed' ? 'text-negative' : 'text-muted'">
-          {{ statusText(sel) }}
-        </div>
-        <div class="row q-gutter-sm q-mt-md">
-          <q-btn
-            v-if="sel.status === 'today'"
-            unelevated
-            no-caps
-            color="primary"
-            text-color="dark"
-            icon="play_arrow"
-            label="Inizia"
-            @click="start(sel)"
-          />
-          <q-btn
-            v-if="sel.status === 'missed'"
-            unelevated
-            no-caps
-            color="primary"
-            text-color="dark"
-            icon="today"
-            label="Fallo oggi"
-            @click="moveTo(sel, today)"
-          />
-          <q-btn outline no-caps icon="event" label="Sposta" @click="askMove(sel)" />
-          <q-btn flat no-caps color="grey-5" icon="block" label="Salta" @click="skipWorkout(sel)" />
-          <q-btn
-            v-if="sel.override"
-            flat
-            no-caps
-            color="grey-5"
-            icon="undo"
-            label="Ripristina"
-            @click="resetDay(sel)"
-          />
-        </div>
-      </template>
-      <template v-else>
-        <div class="text-h6 q-mt-xs">
-          {{ sel.status === 'skipped' ? 'Allenamento saltato' : 'Riposo' }}
-        </div>
-        <div v-if="sel.override?.movedTo" class="text-caption text-muted">
-          Spostato a {{ formatDate(sel.override.movedTo) }}
-        </div>
-        <div class="row q-gutter-sm q-mt-md">
-          <q-btn
-            v-if="sel.date >= today && sel.program"
-            outline
-            no-caps
-            icon="add"
-            label="Pianifica allenamento"
-            @click="askPlan(sel)"
-          />
-          <q-btn
-            v-if="sel.override"
-            flat
-            no-caps
-            color="grey-5"
-            icon="undo"
-            label="Ripristina"
-            @click="resetDay(sel)"
-          />
-        </div>
-      </template>
     </div>
 
     <!-- Allenamenti del mese -->
@@ -154,33 +71,25 @@
 import { computed, ref } from 'vue';
 import { useQuasar } from 'quasar';
 import { useRouter } from 'vue-router';
-import MoveDialog from '@/components/MoveDialog.vue';
-import {
-  moveWorkout,
-  planWorkout,
-  resetDay,
-  skipWorkout,
-  useCalendar,
-} from '@/composables/useCalendar';
+import DaySheet from '@/components/DaySheet.vue';
+import { useCalendar } from '@/composables/useCalendar';
 import type { Session } from '@/db/types';
-import { addDays, calendarDay, dayLetter, monthGrid, type CalendarDay } from '@/domain/calendar';
-import { currentMonth, formatDate, formatMonth, todayIso } from '@/domain/format';
+import { dayLetter, monthGrid, type CalendarDay } from '@/domain/calendar';
+import { currentMonth, formatDate, formatMonth } from '@/domain/format';
+import { useToday } from '@/composables/useToday';
 import { sessionStats } from '@/domain/session';
 import { useExercisesStore } from '@/stores/exercises';
-import { useWorkoutStore } from '@/stores/workout';
 
 const $q = useQuasar();
 const router = useRouter();
 const exercises = useExercisesStore();
-const workout = useWorkoutStore();
 const { input, sessions } = useCalendar();
 
-const today = todayIso();
+const { today } = useToday();
 const month = ref(currentMonth());
-const selected = ref(today);
+const selected = ref(today.value);
 
 const grid = computed(() => monthGrid(month.value, input.value));
-const sel = computed(() => calendarDay(selected.value, input.value));
 
 function shift(n: number) {
   const [y, m] = month.value.split('-').map(Number);
@@ -192,18 +101,6 @@ function tagOf(d: CalendarDay) {
   if (d.sessions.length) return d.planned ? dayLetter(d.program, d.planned.id) || '✓' : '✓';
   if (d.status === 'rest' || d.status === 'skipped') return '';
   return dayLetter(d.program, d.planned?.id);
-}
-
-function statusText(d: CalendarDay) {
-  const moved = d.override?.movedFrom ? ` · spostato da ${formatDate(d.override.movedFrom)}` : '';
-  switch (d.status) {
-    case 'missed':
-      return `Non fatto${moved}`;
-    case 'today':
-      return `In programma oggi${moved}`;
-    default:
-      return `In programma${moved}`;
-  }
 }
 
 const monthSessions = computed(() =>
@@ -220,51 +117,11 @@ function stats(s: Session) {
 
 const open = (id: string) => void router.push({ name: 'workout', params: { id } });
 
-async function start(d: CalendarDay) {
-  if (!d.program || !d.planned) return;
-  open(await workout.startFromDay(d.program, d.planned));
-}
-
-/** Date con un allenamento già previsto nelle prossime settimane, per avvisare dei conflitti. */
-function busyMap(exclude: string) {
-  const busy: Record<string, string> = {};
-  for (let i = 0; i < 60; i++) {
-    const date = addDays(today, i);
-    const d = calendarDay(date, input.value);
-    if (date !== exclude && d.planned && d.status !== 'done') busy[date] = d.planned.name;
-  }
-  return busy;
-}
-
-async function moveTo(d: CalendarDay, to: string) {
-  await moveWorkout(d, to);
-  selected.value = to;
-  $q.notify({
-    message: `${d.planned?.name} spostato a ${to === today ? 'oggi' : formatDate(to)}`,
-    color: 'positive',
-    textColor: 'dark',
-    icon: 'event',
+function openDay(date: string) {
+  selected.value = date;
+  $q.dialog({ component: DaySheet, componentProps: { date } }).onOk((r?: { movedTo?: string }) => {
+    if (r?.movedTo) selected.value = r.movedTo;
   });
-}
-
-function askMove(d: CalendarDay) {
-  $q.dialog({
-    component: MoveDialog,
-    componentProps: { from: d.date, dayName: d.planned?.name ?? '', busy: busyMap(d.date) },
-  }).onOk((to: string) => void moveTo(d, to));
-}
-
-function askPlan(d: CalendarDay) {
-  const p = d.program!;
-  $q.bottomSheet({
-    title: `Allenamento per ${formatDate(d.date)}`,
-    dark: true,
-    actions: p.days.map((day, i) => ({
-      label: `${String.fromCharCode(65 + i)} · ${day.name}`,
-      id: day.id,
-      icon: 'fitness_center',
-    })),
-  }).onOk((a: { id: string }) => void planWorkout(d.date, p.id, a.id));
 }
 </script>
 

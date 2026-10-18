@@ -70,6 +70,29 @@
           </div>
         </div>
 
+        <!-- Dove hai spinto di più rispetto all'ultima volta -->
+        <div v-if="mode === 'view' && progress.length" class="card q-pa-md q-mb-md">
+          <div class="text-weight-bold q-mb-xs">Rispetto all'ultima volta</div>
+          <div class="text-caption text-muted q-mb-sm">
+            Serie migliore di ogni esercizio: massimale stimato, ripetizioni o tempo
+          </div>
+          <div v-for="p in progress" :key="p.exerciseId" class="prog-row row items-center no-wrap">
+            <div class="col" style="min-width: 0">
+              <div class="ellipsis text-weight-medium">{{ p.name }}</div>
+              <div class="text-caption text-muted tabular">
+                <template v-if="p.before !== null">
+                  {{ fmtMetric(p.metric, p.before) }} → {{ fmtMetric(p.metric, p.now) }}
+                </template>
+                <template v-else>prima volta · {{ fmtMetric(p.metric, p.now) }}</template>
+              </div>
+            </div>
+            <div class="delta tabular" :class="deltaClass(p.deltaPct)">
+              <template v-if="p.deltaPct === null">nuovo</template>
+              <template v-else>{{ p.deltaPct > 0 ? '+' : '' }}{{ p.deltaPct }}%</template>
+            </div>
+          </div>
+        </div>
+
         <div v-for="(block, bi) in s.blocks" :key="block.id" class="card block q-mb-md">
           <div class="row items-center q-mb-xs">
             <div class="section-label col">
@@ -78,13 +101,13 @@
               }}
             </div>
             <q-chip
-              v-if="mode !== 'view' && block.restSec > 0"
+              v-if="mode !== 'view' && block.type !== 'single'"
               dense
               outline
               clickable
               icon="timer"
               color="grey-6"
-              :label="`${formatClock(block.restSec)} rec.`"
+              :label="`${formatClock(block.restSec)} dopo il giro`"
               @click="editRest(bi)"
             />
             <q-btn
@@ -102,9 +125,9 @@
                     <q-item-section avatar><q-icon name="link" /></q-item-section>
                     <q-item-section>Aggiungi in superset</q-item-section>
                   </q-item>
-                  <q-item clickable @click="editRest(bi)">
+                  <q-item v-if="block.type !== 'single'" clickable @click="editRest(bi)">
                     <q-item-section avatar><q-icon name="timer" /></q-item-section>
-                    <q-item-section>Recupero</q-item-section>
+                    <q-item-section>Recupero dopo il giro</q-item-section>
                   </q-item>
                   <q-item clickable :disable="bi === 0" @click="workout.moveBlock(bi, -1)">
                     <q-item-section avatar><q-icon name="arrow_upward" /></q-item-section>
@@ -167,10 +190,12 @@ import ExercisePicker from '@/components/ExercisePicker.vue';
 import FinishDialog from '@/components/FinishDialog.vue';
 import TimerBar from '@/components/TimerBar.vue';
 import WorkOverlay from '@/components/WorkOverlay.vue';
+import { useRestPicker } from '@/composables/useRestPicker';
 import { useWakeLock } from '@/composables/useWakeLock';
 import { db } from '@/db';
 import type { SessionItem } from '@/db/types';
-import { formatClock, formatDate } from '@/domain/format';
+import { compareWithLast, type ExerciseProgress } from '@/domain/compare';
+import { formatClock, formatDate, formatDuration, formatKg } from '@/domain/format';
 import { DIFFICULTY } from '@/domain/labels';
 import { sessionRecords, type SessionRecords } from '@/domain/records';
 import { lastPerformance, sessionStats } from '@/domain/session';
@@ -187,6 +212,7 @@ const workout = useWorkoutStore();
 const exercises = useExercisesStore();
 const timer = useTimerStore();
 const settings = useSettingsStore();
+const { pickRest } = useRestPicker();
 
 const s = computed(() => workout.session);
 const editing = ref(false);
@@ -196,6 +222,17 @@ const mode = computed<'live' | 'edit' | 'view'>(() =>
 
 const lastByExercise = shallowRef(new Map<string, SessionItem>());
 const records = shallowRef<SessionRecords>();
+const progress = shallowRef<ExerciseProgress[]>([]);
+
+function fmtMetric(metric: ExerciseProgress['metric'], v: number) {
+  if (metric === 'e1rm') return formatKg(Math.round(v * 10) / 10);
+  if (metric === 'reps') return `${Math.floor(v)} rip`;
+  return formatDuration(Math.round(v));
+}
+
+// ±2% è rumore (un rip in più o in meno): lo mostriamo neutro.
+const deltaClass = (d: number | null) =>
+  d === null ? 'new' : d > 2 ? 'up' : d < -2 ? 'down' : 'flat';
 
 async function loadContext() {
   const cur = s.value;
@@ -212,7 +249,10 @@ async function loadContext() {
     if (p) last.set(id, p);
   }
   lastByExercise.value = last;
-  if (cur.status === 'done') records.value = sessionRecords(cur, history, exercises.byId);
+  if (cur.status === 'done') {
+    records.value = sessionRecords(cur, history, exercises.byId);
+    progress.value = compareWithLast(cur, history, exercises.byId);
+  }
 }
 
 watch(
@@ -274,14 +314,13 @@ function addExercise(joinBlock?: number) {
   }).onOk((id: string) => void workout.addExercise(id, joinBlock));
 }
 
-function editRest(bi: number) {
+async function editRest(bi: number) {
   const block = s.value!.blocks[bi]!;
-  $q.dialog({
-    title: 'Recupero (secondi)',
-    prompt: { model: String(block.restSec), type: 'number', inputmode: 'numeric' },
-    cancel: { flat: true, label: 'Annulla' },
-    ok: { label: 'OK', color: 'primary', unelevated: true },
-  }).onOk((v: string) => (block.restSec = Math.max(0, Number(v) || 0)));
+  const v = await pickRest(
+    block.type === 'single' ? 'Recupero tra le serie' : 'Recupero dopo ogni giro',
+    block.restSec,
+  );
+  if (typeof v === 'number') block.restSec = v;
 }
 
 function rename() {
@@ -295,9 +334,18 @@ function rename() {
 }
 
 function finish() {
-  const pending = s
-    .value!.blocks.flatMap((b) => b.items.flatMap((i) => i.sets))
-    .filter((x) => !x.done).length;
+  const sets = s.value!.blocks.flatMap((b) => b.items.flatMap((i) => i.sets));
+  const pending = sets.filter((x) => !x.done).length;
+  if (pending === sets.length) {
+    // niente da salvare: una sessione vuota segnerebbe il giorno come fatto
+    $q.dialog({
+      title: 'Nessuna serie segnata',
+      message: 'Spunta le serie fatte con ✓. Vuoi annullare questo allenamento?',
+      cancel: { flat: true, label: 'Continua' },
+      ok: { label: 'Annulla allenamento', color: 'negative', unelevated: true },
+    }).onOk(() => void workout.discard().then(() => router.replace('/')));
+    return;
+  }
   $q.dialog({ component: FinishDialog, componentProps: { pending } }).onOk(
     (data: { difficulty?: number; notes?: string }) => void saveFinished(data),
   );
@@ -317,6 +365,8 @@ async function saveFinished(data: { difficulty?: number; notes?: string }) {
 
 async function doneEditing() {
   editing.value = false;
+  // le serie aggiunte in modifica e non spuntate non sono state fatte
+  workout.pruneUndone();
   await workout.flush();
   await loadContext();
 }
@@ -337,7 +387,12 @@ function goBack() {
   else void router.replace('/');
 }
 
-onBeforeUnmount(() => void workout.flush());
+onBeforeUnmount(() => {
+  // il timer di una serie a tempo non deve continuare (e spuntare serie) fuori da questa pagina
+  timer.stopWork();
+  timer.setWorkDoneHandler(() => undefined);
+  void workout.flush();
+});
 </script>
 
 <style scoped lang="scss">
@@ -357,6 +412,25 @@ onBeforeUnmount(() => void workout.flush());
 .superset {
   border-left: 2px dotted rgba(198, 255, 61, 0.5);
   padding-left: 10px;
+}
+.prog-row {
+  padding: 6px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+.delta {
+  font-weight: 800;
+  min-width: 64px;
+  text-align: right;
+  &.up {
+    color: $primary;
+  }
+  &.down {
+    color: $negative;
+  }
+  &.flat,
+  &.new {
+    color: rgba(255, 255, 255, 0.5);
+  }
 }
 .stat {
   font-size: 22px;

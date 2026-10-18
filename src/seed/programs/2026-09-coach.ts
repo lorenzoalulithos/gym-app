@@ -1,6 +1,7 @@
 import type { BlockType, Program, SetTarget } from '@/db/types';
 
-// Scheda del coach seguita da inizio settembre al 17 ottobre 2026, ricostruita dagli screenshot.
+// Scheda del coach seguita da inizio settembre 2026, ricostruita dagli screenshot.
+// Resta attiva finché non arriva la scheda successiva del coach.
 // Gli screenshot sono log, non la scheda: i target sono quelli effettivamente fatti
 // nella settimana 12-17 ottobre, i recuperi sono stimati.
 
@@ -24,7 +25,6 @@ export const program: Program = {
   id: 'coach-2026-09',
   name: 'Coach · settembre-ottobre',
   startDate: '2026-09-01',
-  endDate: '2026-10-18',
   notes: 'Ricostruita dagli screenshot Everfit. Recuperi stimati.',
   source: 'seed',
   updatedAt: 0,

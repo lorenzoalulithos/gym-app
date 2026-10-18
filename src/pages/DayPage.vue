@@ -30,12 +30,13 @@
         />
         <q-space />
         <q-chip
+          v-if="b.type !== 'single'"
           dense
           outline
           clickable
           icon="timer"
           color="grey-6"
-          :label="`${b.restSec}s`"
+          :label="`${formatClock(b.restSec)} dopo il giro`"
           @click="editRest(b)"
         />
         <q-btn flat round dense icon="more_vert" color="grey-6">
@@ -77,6 +78,15 @@
             </div>
             <div v-if="it.notes" class="text-caption text-warning ellipsis">{{ it.notes }}</div>
           </div>
+          <q-chip
+            dense
+            outline
+            clickable
+            icon="timer"
+            :color="it.restSec !== undefined ? 'primary' : 'grey-6'"
+            :label="restAfter(b, ii) ? formatClock(restAfter(b, ii)) : 'no rec.'"
+            @click.stop="editItemRest(b, ii)"
+          />
           <q-btn flat round dense icon="close" color="grey-7" @click.stop="removeItem(bi, ii)" />
         </div>
       </div>
@@ -105,7 +115,9 @@ import SetsEditorDialog from '@/components/SetsEditorDialog.vue';
 import { useEditableProgram } from '@/composables/useEditableProgram';
 import { newId } from '@/db';
 import type { Block, SetTarget } from '@/db/types';
-import { summarizeTargets } from '@/domain/format';
+import { formatClock, summarizeTargets } from '@/domain/format';
+import { restAfter } from '@/domain/session';
+import { useRestPicker } from '@/composables/useRestPicker';
 import { useExercisesStore } from '@/stores/exercises';
 import { useSettingsStore } from '@/stores/settings';
 
@@ -114,6 +126,7 @@ const $q = useQuasar();
 const router = useRouter();
 const exercises = useExercisesStore();
 const settings = useSettingsStore();
+const { pickRest } = useRestPicker();
 const program = useEditableProgram(toRef(props, 'programId'));
 const day = computed(() => program.value?.days.find((d) => d.id === props.dayId));
 
@@ -168,13 +181,25 @@ function move(bi: number, dir: -1 | 1) {
   [blocks[bi], blocks[bi + dir]] = [blocks[bi + dir]!, blocks[bi]!];
 }
 
-function editRest(b: Block) {
-  $q.dialog({
-    title: b.type === 'single' ? 'Recupero tra le serie (sec)' : 'Recupero dopo ogni giro (sec)',
-    prompt: { model: String(b.restSec), type: 'number', inputmode: 'numeric' },
-    cancel: { flat: true, label: 'Annulla' },
-    ok: { label: 'OK', color: 'primary', unelevated: true },
-  }).onOk((v: string) => (b.restSec = Math.max(0, Number(v) || 0)));
+async function editRest(b: Block) {
+  const v = await pickRest('Recupero dopo ogni giro', b.restSec);
+  if (typeof v === 'number') b.restSec = v;
+}
+
+async function editItemRest(b: Block, ii: number) {
+  const it = b.items[ii]!;
+  const v = await pickRest(
+    `Recupero dopo ogni serie di ${exercises.nameOf(it.exerciseId)}`,
+    restAfter(b, ii),
+    it.restSec !== undefined,
+  );
+  if (v === undefined) return;
+  if (v === null) delete it.restSec;
+  else if (b.type === 'single') {
+    // in un blocco singolo il recupero dell'esercizio è quello del blocco
+    b.restSec = v;
+    delete it.restSec;
+  } else it.restSec = v;
 }
 </script>
 

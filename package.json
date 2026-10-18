@@ -15,6 +15,7 @@
     "test": "vitest run",
     "build:pwa": "quasar build -m pwa",
     "library": "node scripts/build-library.mjs",
+    "icons": "node scripts/build-icons.mjs",
     "postinstall": "quasar prepare --silent"
   },
   "dependencies": {

@@ -1,4 +1,5 @@
 import type {
+  Block,
   Exercise,
   LoggedSet,
   Program,
@@ -46,11 +47,30 @@ export function prefillSet(target: SetTarget | undefined, last: LoggedSet | unde
   return set;
 }
 
+/**
+ * Recupero dopo una serie dell'esercizio `ii` del blocco:
+ * prima quello della serie, poi quello dell'esercizio, poi quello del blocco.
+ * In superset/circuito, senza un recupero proprio, si passa subito all'esercizio successivo
+ * e si recupera solo a fine giro.
+ */
+export function restAfter(
+  block: { type: Block['type']; restSec: number; items: { restSec?: number }[] },
+  ii: number,
+  setRest?: number,
+): number {
+  if (setRest !== undefined) return setRest;
+  const own = block.items[ii]?.restSec;
+  if (own !== undefined) return own;
+  const lastOfRound = block.type === 'single' || ii === block.items.length - 1;
+  return lastOfRound ? block.restSec : 0;
+}
+
 export function buildItem(
   exerciseId: string,
   targets: SetTarget[],
   history: Session[],
   notes?: string,
+  restSec?: number,
 ): SessionItem {
   const last = lastPerformance(history, exerciseId);
   const sets = targets.length ? targets : (last?.sets.map(() => ({})) ?? [{}, {}, {}]);
@@ -62,6 +82,7 @@ export function buildItem(
     ),
   };
   if (notes) item.notes = notes;
+  if (restSec !== undefined) item.restSec = restSec;
   return item;
 }
 
@@ -83,7 +104,7 @@ export function sessionFromDay(
       id: uid(),
       type: b.type,
       restSec: b.restSec,
-      items: b.items.map((it) => buildItem(it.exerciseId, it.sets, history, it.notes)),
+      items: b.items.map((it) => buildItem(it.exerciseId, it.sets, history, it.notes, it.restSec)),
     })),
     exerciseIds: [],
     updatedAt: 0,
@@ -111,10 +132,10 @@ export function nextDay(program: Program, history: Session[]): ProgramDay | unde
   return program.days[(idx + 1) % program.days.length];
 }
 
-/** Programma attivo: il più recente già iniziato. */
+/** Programma attivo: il più recente già iniziato e non ancora concluso. */
 export function activeProgram(programs: Program[], today: string): Program | undefined {
   return [...programs]
-    .filter((p) => p.startDate <= today)
+    .filter((p) => p.startDate <= today && (!p.endDate || p.endDate >= today))
     .sort((a, b) => b.startDate.localeCompare(a.startDate))[0];
 }
 

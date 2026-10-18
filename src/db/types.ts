@@ -58,6 +58,8 @@ export interface BlockItem {
   id: string;
   exerciseId: string;
   sets: SetTarget[];
+  /** Recupero dopo ogni serie di questo esercizio; se assente vale quello del blocco (vedi restAfter). */
+  restSec?: number;
   notes?: string;
 }
 
@@ -101,6 +103,7 @@ export interface LoggedSet {
 export interface SessionItem {
   id: string;
   exerciseId: string;
+  restSec?: number;
   notes?: string;
   sets: LoggedSet[];
 }

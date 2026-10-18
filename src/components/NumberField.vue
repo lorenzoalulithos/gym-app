@@ -66,7 +66,8 @@ function parse(raw: string): number | undefined {
   if (!s) return undefined;
   if (props.kind === 'time' && s.includes(':')) {
     const [m, sec] = s.split(':').map(Number);
-    return (m ?? 0) * 60 + (sec ?? 0);
+    const total = (m ?? 0) * 60 + (sec ?? 0);
+    return Number.isFinite(total) ? Math.max(0, total) : undefined;
   }
   const n = Number(s);
   return Number.isFinite(n) ? Math.max(props.min, n) : props.modelValue;

@@ -48,6 +48,18 @@ export async function applySeeds(db: GymDb) {
     });
   }
 
+  // La prima versione chiudeva la scheda del coach al 18/10: resta attiva finché non c'è la nuova.
+  if (!(await applied(db, 'patch:coach-2026-09-open'))) {
+    await db.transaction('rw', db.programs, db.meta, async () => {
+      const p = await db.programs.get(coach202609.id);
+      if (p?.endDate === '2026-10-18') {
+        delete p.endDate;
+        await db.programs.put(p);
+      }
+      await mark(db, 'patch:coach-2026-09-open');
+    });
+  }
+
   if (!(await applied(db, 'history:everfit-2026-10'))) {
     await db.transaction('rw', db.sessions, db.meta, async () => {
       for (const s of seedHistory()) if (!(await db.sessions.get(s.id))) await db.sessions.add(s);

@@ -49,6 +49,14 @@ const input = (
   since: '2026-10-12',
 });
 
+function applyMove(i: CalendarInput, from: string, to: string): CalendarInput {
+  const c = moveOverrides(calendarDay(from, i), to, i)!;
+  const overrides = new Map(i.overrides);
+  for (const d of c.del) overrides.delete(d);
+  for (const o of c.put) overrides.set(o.date, o);
+  return { ...i, overrides };
+}
+
 describe('calendario', () => {
   it('giorno della settimana ISO', () => {
     expect(isoWeekday('2026-10-19')).toBe(1); // lunedì
@@ -76,14 +84,27 @@ describe('calendario', () => {
     const i = input([], [], '2026-10-20');
     const missed = recentMissed(i);
     expect(missed.map((d) => d.date)).toEqual(['2026-10-19', '2026-10-14']);
-    const pair = moveOverrides(missed[0]!, '2026-10-20')!;
-    const after = input([], pair, '2026-10-20');
+    const after = applyMove(i, '2026-10-19', '2026-10-20');
     expect(calendarDay('2026-10-19', after).status).toBe('rest');
     expect(calendarDay('2026-10-20', after)).toMatchObject({
       status: 'today',
       planned: { id: 'a' },
     });
     expect(recentMissed(after).map((d) => d.date)).toEqual(['2026-10-14']);
+  });
+
+  it("spostare due volte e ripristinare non duplica né perde l'allenamento", () => {
+    const today = '2026-10-18';
+    let i = input([], [], today);
+    i = applyMove(i, '2026-10-19', '2026-10-21'); // A lun → mer (B di mercoledì viene sostituito)
+    i = applyMove(i, '2026-10-21', '2026-10-23'); // A mer → ven
+    expect(calendarDay('2026-10-19', i).planned).toBeUndefined();
+    expect(calendarDay('2026-10-21', i).planned?.id).toBe('b'); // mercoledì torna B
+    expect(calendarDay('2026-10-23', i).planned?.id).toBe('a');
+    expect(i.overrides.get('2026-10-19')?.movedTo).toBe('2026-10-23');
+    // riportato al giorno originale: nessuna eccezione rimasta
+    i = applyMove(i, '2026-10-23', '2026-10-19');
+    expect(i.overrides.size).toBe(0);
   });
 
   it('saltare di proposito non genera promemoria', () => {

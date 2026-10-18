@@ -14,6 +14,18 @@
           {{ exercise.nameIt }}
         </div>
       </div>
+      <div v-if="mode !== 'view'" class="col-auto">
+        <q-chip
+          dense
+          outline
+          clickable
+          icon="timer"
+          :color="item.restSec !== undefined ? 'primary' : 'grey-6'"
+          :label="restLabel"
+          class="q-mr-none"
+          @click.stop="editRest"
+        />
+      </div>
       <q-btn v-if="mode !== 'view'" flat round dense icon="more_vert" color="grey-6">
         <q-menu auto-close>
           <q-list style="min-width: 200px">
@@ -104,7 +116,9 @@ import ExerciseInfoDialog from './ExerciseInfoDialog.vue';
 import type { SessionItem } from '@/db/types';
 import { formatSet, summarizeTargets } from '@/domain/format';
 import type { SessionRecords } from '@/domain/records';
-import { suggestIncrease } from '@/domain/session';
+import { restAfter, suggestIncrease } from '@/domain/session';
+import { formatClock } from '@/domain/format';
+import { useRestPicker } from '@/composables/useRestPicker';
 import { useExercisesStore } from '@/stores/exercises';
 import { useSettingsStore } from '@/stores/settings';
 import { useTimerStore } from '@/stores/timer';
@@ -127,6 +141,21 @@ const timer = useTimerStore();
 const settings = useSettingsStore();
 
 const exercise = computed(() => exercises.get(props.item.exerciseId));
+const { pickRest } = useRestPicker();
+
+const block = computed(() => workout.session?.blocks[props.bi]);
+const restSec = computed(() => (block.value ? restAfter(block.value, props.ii) : 0));
+const restLabel = computed(() => (restSec.value ? formatClock(restSec.value) : 'no rec.'));
+
+async function editRest() {
+  const v = await pickRest(
+    `Recupero dopo ogni serie di ${exercise.value?.name ?? ''}`,
+    restSec.value,
+    props.item.restSec !== undefined,
+  );
+  if (v === undefined) return;
+  workout.setItemRest(props.bi, props.ii, v === null ? undefined : v);
+}
 const forceWeight = ref(false);
 
 const targets = computed(() => props.item.sets.map((s) => s.target).filter((t) => t !== undefined));
