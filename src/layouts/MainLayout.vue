@@ -38,7 +38,7 @@ const tabs = [
 function isActive(to: string) {
   const p = route.path;
   if (to === '/') return p === '/';
-  if (to === '/altro') return p.startsWith('/altro') || p.startsWith('/foto');
+  if (to === '/altro') return ['/altro', '/foto', '/report', '/corpo'].some((x) => p.startsWith(x));
   return p.startsWith(to);
 }
 </script>

@@ -11,6 +11,7 @@ import {
   type CalendarInput,
 } from '@/domain/calendar';
 import { reminderFor } from '@/domain/reminder';
+import { monthReport } from '@/domain/report';
 
 // Settimana tipo: A lunedì, B mercoledì
 const program: Program = {
@@ -124,5 +125,55 @@ describe('calendario', () => {
     expect(reminderFor(input([]), '2026-10-21')?.title).toBe('Oggi: B');
     expect(reminderFor(input([], [], '2026-10-20'), '2026-10-20')?.title).toBe('Hai saltato A');
     expect(reminderFor(input([done('2026-10-21', 'b')]), '2026-10-21')).toBeNull();
+  });
+});
+
+describe('report mensile', () => {
+  it('costanza, muscoli e corpo del mese', () => {
+    const exercises = new Map([
+      [
+        'x',
+        {
+          id: 'x',
+          name: 'X',
+          measure: 'weight_reps',
+          implements: 1,
+          primaryMuscles: ['chest'],
+        } as never,
+      ],
+    ]);
+    const s = (date: string, dayId: string, w: number): Session => ({
+      ...done(date, dayId),
+      blocks: [
+        {
+          id: 'b',
+          type: 'single',
+          restSec: 60,
+          items: [
+            { id: `i${date}`, exerciseId: 'x', sets: [{ weightKg: w, reps: 10, done: true }] },
+          ],
+        },
+      ],
+      exerciseIds: ['x'],
+    });
+    const sessions = [s('2026-10-12', 'a', 20), s('2026-10-19', 'a', 22)];
+    const r = monthReport(
+      '2026-10',
+      input(sessions, [], '2026-10-21'),
+      sessions,
+      exercises,
+      [
+        { id: '1', date: '2026-10-02', weightKg: 80 },
+        { id: '2', date: '2026-10-20', weightKg: 79.2, waistCm: 84 },
+      ],
+      '2026-10-21',
+    );
+    expect(r.done).toBe(2);
+    expect(r.missed).toBe(1); // mercoledì 14 (B) non fatto
+    expect(r.adherencePct).toBe(67);
+    expect(r.exercises[0]).toMatchObject({ exerciseId: 'x', sessions: 2 });
+    expect(r.exercises[0]!.deltaPct).toBeCloseTo(10, 0);
+    expect(r.muscleSets[0]!.muscle).toBe('chest');
+    expect(r.body.find((b) => b.field === 'weightKg')?.delta).toBe(-0.8);
   });
 });

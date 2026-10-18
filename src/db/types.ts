@@ -150,9 +150,16 @@ export interface BodyMetric {
   /** YYYY-MM-DD */
   date: string;
   weightKg?: number;
+  /** Circonferenze in cm, misurate sempre nello stesso punto. */
   waistCm?: number;
+  chestCm?: number;
+  armCm?: number;
+  thighCm?: number;
+  hipsCm?: number;
   notes?: string;
 }
+
+export type BodyField = 'weightKg' | 'waistCm' | 'chestCm' | 'armCm' | 'thighCm' | 'hipsCm';
 
 /**
  * Eccezione al calendario settimanale della scheda per una data:

@@ -217,8 +217,17 @@
     </template>
 
     <!-- Il mese -->
-    <div class="section-label q-mb-xs" style="text-transform: none">
-      <span class="text-uppercase">{{ monthName }}</span>
+    <div class="row items-center q-mb-xs">
+      <div class="section-label col">{{ monthName }}</div>
+      <q-btn
+        flat
+        dense
+        no-caps
+        color="primary"
+        label="Report"
+        icon-right="chevron_right"
+        to="/report"
+      />
     </div>
     <div class="row q-col-gutter-sm q-mb-md">
       <div class="col-4">
@@ -244,7 +253,7 @@
         </div>
       </div>
       <div class="col-4">
-        <div class="card stat-tile" @click="router.push('/foto')">
+        <div class="card stat-tile" @click="router.push('/corpo')">
           <template v-if="weight">
             <div class="stat-num tabular">{{ weight.weightKg.toLocaleString('it-IT') }}</div>
             <div class="stat-label">

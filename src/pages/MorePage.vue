@@ -2,11 +2,27 @@
   <q-page class="page-pad">
     <div class="text-h5 text-weight-bold q-mb-md q-mt-sm">Altro</div>
 
-    <q-list class="card q-mb-lg">
+    <q-list class="card q-mb-lg" separator>
+      <q-item clickable to="/report">
+        <q-item-section avatar><q-icon name="insights" color="primary" /></q-item-section>
+        <q-item-section>
+          <q-item-label>Report mensile</q-item-label>
+          <q-item-label caption>Costanza, muscoli, esercizi, corpo</q-item-label>
+        </q-item-section>
+        <q-item-section side><q-icon name="chevron_right" /></q-item-section>
+      </q-item>
+      <q-item clickable to="/corpo">
+        <q-item-section avatar><q-icon name="monitor_weight" color="secondary" /></q-item-section>
+        <q-item-section>
+          <q-item-label>Peso e misure</q-item-label>
+          <q-item-label caption>Peso, vita, petto, braccio, coscia, fianchi</q-item-label>
+        </q-item-section>
+        <q-item-section side><q-icon name="chevron_right" /></q-item-section>
+      </q-item>
       <q-item clickable to="/foto">
         <q-item-section avatar><q-icon name="photo_camera" color="secondary" /></q-item-section>
         <q-item-section>
-          <q-item-label>Foto progressi e peso</q-item-label>
+          <q-item-label>Foto progressi</q-item-label>
           <q-item-label caption>Fronte, lato, schiena ogni mese</q-item-label>
         </q-item-section>
         <q-item-section side><q-icon name="chevron_right" /></q-item-section>

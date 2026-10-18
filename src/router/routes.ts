@@ -30,6 +30,8 @@ const routes: RouteRecordRaw[] = [
       },
       { path: 'foto', name: 'photos', component: () => import('@/pages/PhotosPage.vue') },
       { path: 'altro', name: 'more', component: () => import('@/pages/MorePage.vue') },
+      { path: 'report', name: 'report', component: () => import('@/pages/ReportPage.vue') },
+      { path: 'corpo', name: 'body', component: () => import('@/pages/BodyPage.vue') },
     ],
   },
   {

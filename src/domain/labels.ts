@@ -1,4 +1,4 @@
-import type { LoadMode, Measure, Pose } from '@/db/types';
+import type { BodyField, LoadMode, Measure, Pose } from '@/db/types';
 
 export const MUSCLES: Record<string, string> = {
   abdominals: 'Addome',
@@ -60,3 +60,12 @@ export const DIFFICULTY = ['', 'Facile', 'Moderato', 'Impegnativo', 'Difficile',
 
 export const muscleLabel = (m: string) => MUSCLES[m] ?? m;
 export const equipmentLabel = (e: string) => EQUIPMENT[e] ?? e;
+
+export const BODY_FIELDS: Record<BodyField, { label: string; unit: string; hint: string }> = {
+  weightKg: { label: 'Peso', unit: 'kg', hint: 'al mattino, a digiuno' },
+  waistCm: { label: 'Vita', unit: 'cm', hint: "all'altezza dell'ombelico" },
+  chestCm: { label: 'Petto', unit: 'cm', hint: "all'altezza dei capezzoli" },
+  armCm: { label: 'Braccio', unit: 'cm', hint: 'bicipite contratto, punto più largo' },
+  thighCm: { label: 'Coscia', unit: 'cm', hint: 'punto più largo' },
+  hipsCm: { label: 'Fianchi', unit: 'cm', hint: 'punto più largo dei glutei' },
+};
