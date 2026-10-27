@@ -8,6 +8,14 @@
           <div v-if="s" class="text-caption text-muted">{{ formatDate(s.date) }}</div>
         </q-toolbar-title>
         <q-btn
+          v-if="mode === 'live' && roundsAvailable"
+          flat
+          round
+          icon="sports_mma"
+          aria-label="Modalità round"
+          @click="router.push({ name: 'rounds', params: { id } })"
+        />
+        <q-btn
           v-if="mode === 'live'"
           flat
           round
@@ -80,20 +88,38 @@
                 <div class="stat tabular">{{ stats.minutes ?? '–' }}</div>
                 <div class="text-caption text-muted">minuti</div>
               </div>
-              <div class="col">
-                <div class="stat tabular">{{ stats.sets }}</div>
-                <div class="text-caption text-muted">serie</div>
-              </div>
-              <div class="col">
-                <div class="stat tabular">
-                  {{ Math.round(stats.volume).toLocaleString('it-IT') }}
+              <template v-if="s.mode === 'rounds'">
+                <div class="col">
+                  <div class="stat tabular">{{ stats.sets }}</div>
+                  <div class="text-caption text-muted">round</div>
                 </div>
-                <div class="text-caption text-muted">kg volume</div>
-              </div>
-              <div class="col">
-                <div class="stat tabular text-warning">{{ records?.count ?? 0 }}</div>
-                <div class="text-caption text-muted">record</div>
-              </div>
+                <div class="col">
+                  <div class="stat tabular">{{ formatClock(rounds.workSec) }}</div>
+                  <div class="text-caption text-muted">di lavoro</div>
+                </div>
+                <div class="col">
+                  <div class="stat tabular">
+                    {{ s.rpe ?? '–' }}<span v-if="s.rpe" class="text-caption">/10</span>
+                  </div>
+                  <div class="text-caption text-muted">fatica</div>
+                </div>
+              </template>
+              <template v-else>
+                <div class="col">
+                  <div class="stat tabular">{{ stats.sets }}</div>
+                  <div class="text-caption text-muted">serie</div>
+                </div>
+                <div class="col">
+                  <div class="stat tabular">
+                    {{ Math.round(stats.volume).toLocaleString('it-IT') }}
+                  </div>
+                  <div class="text-caption text-muted">kg volume</div>
+                </div>
+                <div class="col">
+                  <div class="stat tabular text-warning">{{ records?.count ?? 0 }}</div>
+                  <div class="text-caption text-muted">record</div>
+                </div>
+              </template>
             </div>
             <div v-if="s.difficulty || s.notes" class="q-mt-sm text-center text-muted">
               <span v-if="s.difficulty">Difficoltà: {{ DIFFICULTY[s.difficulty] }}</span>
@@ -229,6 +255,7 @@ import { useRouter } from 'vue-router';
 import ExerciseCard from '@/components/ExerciseCard.vue';
 import ExercisePicker from '@/components/ExercisePicker.vue';
 import FinishDialog from '@/components/FinishDialog.vue';
+import { canRunAsRounds, roundStats } from '@/domain/rounds';
 import FocusView from '@/components/FocusView.vue';
 import ShareDialog from '@/components/ShareDialog.vue';
 import StartSplash from '@/components/StartSplash.vue';
@@ -260,6 +287,9 @@ const settings = useSettingsStore();
 const { pickRest } = useRestPicker();
 
 const s = computed(() => workout.session);
+/** Solo serie a tempo (sacco, corda…): si può fare col timer a round. */
+const rounds = computed(() => (s.value ? roundStats(s.value) : { done: 0, total: 0, workSec: 0 }));
+const roundsAvailable = computed(() => !!s.value && canRunAsRounds(s.value));
 const editing = ref(false);
 const mode = computed<'live' | 'edit' | 'view'>(() =>
   s.value?.status === 'active' ? 'live' : editing.value ? 'edit' : 'view',
@@ -313,6 +343,13 @@ watch(
   async (id) => {
     const loaded = await workout.load(id);
     if (!loaded) return void router.replace('/');
+    // sessione a round in corso: si apre il timer (dalla vista elenco si arriva con ?lista)
+    if (
+      loaded.mode === 'rounds' &&
+      loaded.status === 'active' &&
+      !router.currentRoute.value.query.lista
+    )
+      return void router.replace({ name: 'rounds', params: { id } });
     // allenamento appena avviato: schermata di partenza
     splash.value = loaded.status === 'active' && Date.now() - (loaded.startedAt ?? 0) < 4000;
     await loadContext();

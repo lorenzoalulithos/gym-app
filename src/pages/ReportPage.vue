@@ -93,6 +93,33 @@
         </div>
       </div>
 
+      <!-- Condizionamento: sacco, corda, tabata -->
+      <template v-if="r.conditioning.minutes > 0">
+        <div class="section-label q-mb-xs">Condizionamento</div>
+        <div class="card q-pa-md q-mb-md">
+          <div class="row items-baseline q-mb-sm">
+            <div class="tile-num tabular">
+              {{ r.conditioning.minutes }}<span class="tile-of"> min</span>
+            </div>
+            <div class="col text-right text-caption text-muted">
+              {{ r.conditioning.rounds }} round in {{ r.conditioning.sessions }}
+              {{ r.conditioning.sessions === 1 ? 'sessione' : 'sessioni' }} ·
+              {{ r.conditioning.perWeekAvg }} min a settimana
+            </div>
+          </div>
+          <div v-for="w in weeks" :key="'c' + w.monday" class="bar-row">
+            <div class="bar-label">{{ weekLabel(w.monday) }}</div>
+            <div class="bar-track">
+              <div class="bar cond" :style="{ width: `${(w.conditioningMin / maxCond) * 100}%` }" />
+            </div>
+            <div class="bar-value tabular">{{ w.conditioningMin }}′</div>
+          </div>
+          <div class="text-caption text-muted q-mt-sm">
+            Solo i minuti di lavoro effettivo, pause escluse.
+          </div>
+        </div>
+      </template>
+
       <!-- Muscoli -->
       <template v-if="r.muscleSets.length">
         <div class="section-label q-mb-xs">Serie a settimana per muscolo</div>
@@ -249,6 +276,7 @@ const comparable = computed(() => r.value.exercises.filter((e) => e.deltaPct !==
 const hiddenCount = computed(() => r.value.exercises.length - comparable.value.length);
 const shownExercises = computed(() => (showAll.value ? r.value.exercises : comparable.value));
 
+const maxCond = computed(() => Math.max(10, ...r.value.weeks.map((w) => w.conditioningMin)));
 const maxSets = computed(() => Math.max(20, ...r.value.muscleSets.map((m) => m.perWeek)));
 const volumeDelta = computed(() =>
   r.value.prevVolume > 0
@@ -299,6 +327,9 @@ onBeforeUnmount(() => photoUrls.value.forEach((p) => URL.revokeObjectURL(p.url))
 </script>
 
 <style scoped lang="scss">
+.bar.cond {
+  background: $negative;
+}
 .month {
   text-transform: capitalize;
 }

@@ -21,6 +21,8 @@ export interface WeekRow {
   done: number;
   planned: number;
   missed: number;
+  /** Minuti di lavoro effettivo a round / cardio (sacco, corda…). */
+  conditioningMin: number;
 }
 
 export interface MonthReport {
@@ -35,6 +37,8 @@ export interface MonthReport {
   prevVolume: number;
   records: number;
   weeks: WeekRow[];
+  /** Condizionamento (sacco, corda, tabata…): minuti di lavoro effettivo, pause escluse. */
+  conditioning: { minutes: number; sessions: number; rounds: number; perWeekAvg: number };
   /** Serie a settimana per gruppo muscolare (muscoli principali), dal più allenato. */
   muscleSets: { muscle: string; perWeek: number }[];
   exercises: ExerciseMonthTrend[];
@@ -43,6 +47,23 @@ export interface MonthReport {
 
 const metricOf = (ex: Exercise): ExerciseMonthTrend['metric'] =>
   ex.measure === 'weight_reps' ? 'e1rm' : ex.measure === 'reps' ? 'reps' : 'time';
+
+/** Secondi di lavoro a tempo che contano come condizionamento in una sessione. */
+export function conditioningSec(s: Session, exercises: Map<string, Exercise>) {
+  let sec = 0;
+  let rounds = 0;
+  for (const b of s.blocks)
+    for (const it of b.items) {
+      const cardio = s.mode === 'rounds' || exercises.get(it.exerciseId)?.category === 'cardio';
+      if (!cardio) continue;
+      for (const set of it.sets)
+        if (isWorkSet(set) && set.durationSec) {
+          sec += set.durationSec;
+          rounds++;
+        }
+    }
+  return { sec, rounds };
+}
 
 const lastDayOf = (month: string) => addDays(`${addDays(`${month}-28`, 7).slice(0, 7)}-01`, -1);
 
@@ -69,7 +90,8 @@ export function monthReport(
   for (let d = first; d <= last; d = addDays(d, 1)) {
     const c = calendarDay(d, input);
     const monday = addDays(d, -(isoWeekday(d) - 1));
-    if (!weeks.has(monday)) weeks.set(monday, { monday, done: 0, planned: 0, missed: 0 });
+    if (!weeks.has(monday))
+      weeks.set(monday, { monday, done: 0, planned: 0, missed: 0, conditioningMin: 0 });
     const w = weeks.get(monday)!;
     if (c.status === 'done') w.done++;
     if (['done', 'missed', 'today', 'planned'].includes(c.status)) {
@@ -88,7 +110,17 @@ export function monthReport(
   let volume = 0;
   let records = 0;
   const muscle = new Map<string, number>();
+  const conditioning = { minutes: 0, sessions: 0, rounds: 0, perWeekAvg: 0 };
+  let condSec = 0;
   for (const s of inMonth) {
+    const c = conditioningSec(s, exercises);
+    if (c.sec > 0) {
+      condSec += c.sec;
+      conditioning.sessions++;
+      conditioning.rounds += c.rounds;
+      const w = weeks.get(addDays(s.date, -(isoWeekday(s.date) - 1)));
+      if (w) w.conditioningMin += c.sec / 60;
+    }
     const st = sessionStats(s, exercises);
     minutes += st.minutes ?? 0;
     sets += st.sets;
@@ -110,6 +142,10 @@ export function monthReport(
     ((new Date(`${end}T12:00`).getTime() - new Date(`${first}T12:00`).getTime()) / 86400000 + 1) /
       7,
   );
+
+  conditioning.minutes = Math.round(condSec / 60);
+  conditioning.perWeekAvg = Math.round(condSec / 60 / weeksElapsed);
+  for (const w of weeks.values()) w.conditioningMin = Math.round(w.conditioningMin);
 
   const prevFirst = `${addDays(first, -1).slice(0, 7)}-01`;
   const prevVolume = done
@@ -181,6 +217,7 @@ export function monthReport(
     prevVolume,
     records,
     weeks: [...weeks.values()],
+    conditioning,
     muscleSets: [...muscle]
       .map(([m, n]) => ({ muscle: m, perWeek: Math.round((n / weeksElapsed) * 10) / 10 }))
       .sort((a, b) => b.perWeek - a.perWeek),

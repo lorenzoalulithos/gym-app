@@ -58,8 +58,10 @@ export function calendarDay(date: string, input: CalendarInput): CalendarDay {
   const today = input.today ?? todayIso();
   const { program, planned, override } = plannedFor(date, input);
   const sessions = (input.sessionsByDate.get(date) ?? []).filter((s) => s.status === 'done');
+  // sacco o corda fuori scheda non sostituiscono l'allenamento previsto quel giorno
+  const counted = planned ? sessions.filter((s) => s.mode !== 'rounds' || s.programId) : sessions;
   let status: DayStatus;
-  if (sessions.length) status = 'done';
+  if (counted.length) status = 'done';
   else if (override?.skipped) status = 'skipped';
   else if (!planned || (input.since && date < input.since)) status = 'rest';
   else if (date < today) status = 'missed';

@@ -347,16 +347,21 @@
       </q-list>
     </template>
 
-    <q-btn
-      v-if="!active"
-      flat
-      no-caps
-      color="grey-5"
-      icon="add"
-      label="Allenamento libero"
-      class="full-width q-py-sm"
-      @click="startFree"
-    />
+    <!-- fuori scheda: pesi a scelta oppure a round (sacco, corda, tabata) -->
+    <div v-if="!active" class="row q-col-gutter-sm q-mt-sm">
+      <div class="col-6">
+        <button type="button" class="free-tile" @click="startFree">
+          <q-icon name="fitness_center" size="24px" />
+          <span>Allenamento libero</span>
+        </button>
+      </div>
+      <div class="col-6">
+        <button type="button" class="free-tile rounds" @click="startRoundsSetup">
+          <q-icon name="sports_mma" size="24px" />
+          <span>Round: sacco, corda</span>
+        </button>
+      </div>
+    </div>
   </q-page>
 </template>
 
@@ -366,6 +371,8 @@ import { useRouter } from 'vue-router';
 import { useQuasar } from 'quasar';
 import DeloadDialog from '@/components/DeloadDialog.vue';
 import MoveDialog from '@/components/MoveDialog.vue';
+import RoundsSetupDialog from '@/components/RoundsSetupDialog.vue';
+import type { RoundPlan } from '@/domain/rounds';
 import { deloadWindows, endDeload, useDeload } from '@/composables/useDeload';
 import { moveWorkout, skipWorkout, useCalendar } from '@/composables/useCalendar';
 import { useLiveQuery } from '@/composables/useLiveQuery';
@@ -591,9 +598,43 @@ async function start() {
 async function startFree() {
   open(await workout.startEmpty());
 }
+
+/** Sacco, corda, tabata: si sceglie il programma e si va al timer a round. */
+function startRoundsSetup() {
+  $q.dialog({ component: RoundsSetupDialog }).onOk((plan: RoundPlan) => {
+    const names = [...new Set(plan.exerciseIds)].map((id) => exercises.nameItOf(id));
+    void workout
+      .startRounds(plan, names.join(' + ') || 'Round')
+      .then((id) => router.push({ name: 'rounds', params: { id } }));
+  });
+}
 </script>
 
 <style scoped lang="scss">
+.free-tile {
+  width: 100%;
+  min-height: 64px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  background: $dark;
+  color: rgba(255, 255, 255, 0.85);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px;
+  cursor: pointer;
+  transition: transform 0.08s ease;
+  &:active {
+    transform: scale(0.96);
+  }
+  &.rounds .q-icon {
+    color: $negative;
+  }
+}
 .hero {
   background: linear-gradient(160deg, #1c2114 0%, $dark 60%);
   border: 1px solid rgba(198, 255, 61, 0.15);

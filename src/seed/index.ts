@@ -11,7 +11,7 @@ import { program as coach202609 } from './programs/2026-09-coach';
 export const SEED_PROGRAMS: Program[] = [coach202609];
 
 /** Aumentare quando cambia la libreria esercizi, per reimportarla. */
-const LIBRARY_VERSION = 1;
+const LIBRARY_VERSION = 2;
 
 async function applied(db: GymDb, key: string) {
   return (await db.meta.get(`seed:${key}`)) !== undefined;
@@ -57,6 +57,16 @@ export async function applySeeds(db: GymDb) {
         await db.programs.put(p);
       }
       await mark(db, 'patch:coach-2026-09-open');
+    });
+  }
+
+  // Le corde navali si fanno a tempo (prima risultavano a ripetizioni).
+  if (!(await applied(db, 'patch:battling-ropes-time'))) {
+    await db.transaction('rw', db.exercises, db.meta, async () => {
+      const e = await db.exercises.get('battling-ropes');
+      if (e && e.updatedAt === 0 && e.measure === 'reps')
+        await db.exercises.put({ ...e, ...LIBRARY_OVERRIDES['battling-ropes'] });
+      await mark(db, 'patch:battling-ropes-time');
     });
   }
 

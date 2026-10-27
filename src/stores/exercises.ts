@@ -55,6 +55,8 @@ export const useExercisesStore = defineStore('exercises', () => {
 
   const get = (id: string) => byId.value.get(id);
   const nameOf = (id: string) => byId.value.get(id)?.name ?? id;
+  /** Nome italiano se c'è (usato dove si legge a colpo d'occhio, es. modalità round). */
+  const nameItOf = (id: string) => byId.value.get(id)?.nameIt ?? nameOf(id);
 
   async function save(ex: Exercise) {
     await db.exercises.put({ ...ex, updatedAt: Date.now() });
@@ -66,5 +68,5 @@ export const useExercisesStore = defineStore('exercises', () => {
     return byId.value.has(base) ? `${base}-${Date.now().toString(36)}` : base;
   }
 
-  return { list, byId, usage, search, get, nameOf, save, newIdFor };
+  return { list, byId, usage, search, get, nameOf, nameItOf, save, newIdFor };
 });

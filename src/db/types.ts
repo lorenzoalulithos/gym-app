@@ -50,6 +50,8 @@ export interface SetTarget {
   kind?: 'normal' | 'warmup' | 'drop';
   /** Sovrascrive il recupero del blocco per questa serie. */
   restSec?: number;
+  /** Tema della serie/round (es. "jab-diretto"), mostrato in grande nella modalità round. */
+  note?: string;
 }
 
 export type BlockType = 'single' | 'superset' | 'circuit';
@@ -137,6 +139,10 @@ export interface Session {
   exerciseIds: string[];
   /** Allenamento della settimana di scarico: esce da stalli, confronti e precompilazione. */
   deload?: boolean;
+  /** Sessione a round (sacco, corda, tabata): timer lavoro/pausa che avanza da solo. */
+  mode?: 'rounds';
+  /** Fatica percepita 1-10 (sessioni a round). */
+  rpe?: number;
   updatedAt: number;
 }
 

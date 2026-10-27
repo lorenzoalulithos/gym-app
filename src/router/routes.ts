@@ -43,6 +43,12 @@ const routes: RouteRecordRaw[] = [
     props: true,
   },
   {
+    path: '/round/:id',
+    name: 'rounds',
+    component: () => import('@/pages/RoundsPage.vue'),
+    props: true,
+  },
+  {
     path: '/:catchAll(.*)*',
     redirect: '/',
   },

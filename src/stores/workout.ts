@@ -7,6 +7,7 @@ import { todayIso } from '@/domain/format';
 import { buildItem, emptySession, restAfter, sessionFromDay, touchSession } from '@/domain/session';
 import { deloadWindows } from '@/composables/useDeload';
 import { deloadSession, isDeloadDate } from '@/domain/deload';
+import { roundsSession, type RoundPlan } from '@/domain/rounds';
 import { useExercisesStore } from './exercises';
 import { useSettingsStore } from './settings';
 import { useTimerStore } from './timer';
@@ -105,6 +106,18 @@ export const useWorkoutStore = defineStore('workout', () => {
 
   function startEmpty() {
     return startOnce(() => Promise.resolve(emptySession(todayIso())));
+  }
+
+  function startRounds(plan: RoundPlan, title: string) {
+    return startOnce(() => Promise.resolve(roundsSession(plan, todayIso(), title)));
+  }
+
+  /** Round finito (o interrotto): segna i secondi fatti, senza far partire il recupero. */
+  function markRound(bi: number, ii: number, si: number, sec: number) {
+    const set = item(bi, ii).sets[si]!;
+    set.done = true;
+    set.durationSec = sec;
+    set.completedAt = Date.now();
   }
 
   /** Toglie serie non spuntate ed esercizi rimasti vuoti. */
@@ -231,12 +244,13 @@ export const useWorkoutStore = defineStore('workout', () => {
   }
 
   /** Chiude la sessione: scarta le serie non fatte e gli esercizi saltati. */
-  async function finish(data: { difficulty?: number; notes?: string }) {
+  async function finish(data: { difficulty?: number; rpe?: number; notes?: string }) {
     const s = session.value;
     if (!s) return;
     s.status = 'done';
     s.endedAt = Date.now();
     if (data.difficulty) s.difficulty = data.difficulty;
+    if (data.rpe) s.rpe = data.rpe;
     if (data.notes) s.notes = data.notes;
     pruneUndone();
     const timer = useTimerStore();
@@ -264,6 +278,8 @@ export const useWorkoutStore = defineStore('workout', () => {
     pruneUndone,
     startFromDay,
     startEmpty,
+    startRounds,
+    markRound,
     completeSet,
     uncompleteSet,
     addSet,
