@@ -9,7 +9,7 @@ describe('seed', () => {
     const db = new GymDb('test-seed');
     await applySeeds(db);
     await applySeeds(db);
-    expect(await db.programs.count()).toBe(1);
+    expect(await db.programs.count()).toBe(SEED_PROGRAMS.length);
     expect(await db.sessions.count()).toBe(4);
     expect(await db.exercises.count()).toBeGreaterThan(600);
   });
@@ -25,6 +25,14 @@ describe('seed', () => {
       expect(ex, id).toBeDefined();
       for (const img of ex!.images) expect(existsSync(`public/${img}`), img).toBe(true);
     }
+  });
+
+  it('la nuova scheda del coach arriva come bozza e non sostituisce da sola la precedente', async () => {
+    const db = new GymDb('test-seed-4');
+    await applySeeds(db);
+    expect((await db.programs.get('coach-2026-11'))?.draft).toBe(true);
+    expect((await db.programs.get('coach-2026-09'))?.endDate).toBeUndefined();
+    expect((await db.exercises.get('flutter-kicks'))?.measure).toBe('time_reps');
   });
 
   it('non sovrascrive una scheda modificata', async () => {

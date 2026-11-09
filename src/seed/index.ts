@@ -3,15 +3,16 @@ import type { Exercise, Program } from '@/db/types';
 import { CUSTOM_EXERCISES, LIBRARY_OVERRIDES, fromLibrary, type LibraryEntry } from './exercises';
 import { seedHistory } from './history';
 import { program as coach202609 } from './programs/2026-09-coach';
+import { program as coach202611 } from './programs/2026-11-coach';
 
 /**
  * Schede incluse nella build. Per aggiungere la scheda del mese:
  * creare src/seed/programs/AAAA-MM-*.ts e aggiungerla qui.
  */
-export const SEED_PROGRAMS: Program[] = [coach202609];
+export const SEED_PROGRAMS: Program[] = [coach202609, coach202611];
 
 /** Aumentare quando cambia la libreria esercizi, per reimportarla. */
-const LIBRARY_VERSION = 2;
+const LIBRARY_VERSION = 3;
 
 async function applied(db: GymDb, key: string) {
   return (await db.meta.get(`seed:${key}`)) !== undefined;
@@ -67,6 +68,16 @@ export async function applySeeds(db: GymDb) {
       if (e && e.updatedAt === 0 && e.measure === 'reps')
         await db.exercises.put({ ...e, ...LIBRARY_OVERRIDES['battling-ropes'] });
       await mark(db, 'patch:battling-ropes-time');
+    });
+  }
+
+  // Le flutter kicks il coach le dà sia a tempo sia a ripetizioni.
+  if (!(await applied(db, 'patch:flutter-kicks-time-reps'))) {
+    await db.transaction('rw', db.exercises, db.meta, async () => {
+      const e = await db.exercises.get('flutter-kicks');
+      if (e && e.updatedAt === 0 && e.measure === 'time')
+        await db.exercises.put({ ...e, ...LIBRARY_OVERRIDES['flutter-kicks'] });
+      await mark(db, 'patch:flutter-kicks-time-reps');
     });
   }
 
